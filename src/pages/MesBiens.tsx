@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Zap, Gem, Shield } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
+import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Shield, Monitor, WashingMachine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import Layout from "@/components/layout/Layout";
 import QRCodeGenerator from "@/components/QRCodeGenerator";
 import TransferDialog from "@/components/TransferDialog";
@@ -19,19 +18,19 @@ import {
 
 const categoryIcons: Record<string, any> = {
   telephone: Smartphone,
-  vehicule: Car,
-  informatique: Laptop,
-  energie: Zap,
-  bijoux: Gem,
-  electromenager: Shield,
+  voiture: Car,
+  moto: Car,
+  ordinateur: Laptop,
+  televiseur: Monitor,
+  electromenager: WashingMachine,
 };
 
 const categoryLabels: Record<string, string> = {
   telephone: "Téléphone",
-  vehicule: "Véhicule",
-  informatique: "Informatique",
-  energie: "Énergie",
-  bijoux: "Bijoux",
+  voiture: "Voiture",
+  moto: "Moto",
+  ordinateur: "Ordinateur",
+  televiseur: "Téléviseur",
   electromenager: "Électroménager",
 };
 
@@ -43,14 +42,16 @@ const statutConfig: Record<string, { bg: string; text: string; label: string }> 
   retrouve: { bg: "bg-emerald-100", text: "text-emerald-700", label: "🟢 Retrouvé" },
 };
 
-// Demo data
-const demoBiens = [
+const demoAppareils = [
   { id: 1, nom: "iPhone 14 Pro", categorie: "telephone", marque: "Apple", identifiant: "IMEI: 352789102345678", statut: "propre", token: "ST-CI-2026-ABC12345", dateEnregistrement: "2026-01-15" },
-  { id: 2, nom: "Moto Honda CBR", categorie: "vehicule", marque: "Honda", identifiant: "VIN: JH2MC130XXK000123", statut: "propre", token: "ST-CI-2026-XYZ98765", dateEnregistrement: "2026-02-01" },
-  { id: 3, nom: "MacBook Pro 16\"", categorie: "informatique", marque: "Apple", identifiant: "S/N: C02XL0FDJGH5", statut: "vole", token: "ST-CI-2026-MAC45678", dateEnregistrement: "2025-11-20" },
-  { id: 4, nom: "Panneau Solaire 400W", categorie: "energie", marque: "JA Solar", identifiant: "S/N: JAS400-2024-001", statut: "propre", token: "ST-CI-2026-SOL11111", dateEnregistrement: "2026-02-10" },
-  { id: 5, nom: "Bague en Or 18K", categorie: "bijoux", marque: "Artisanal", identifiant: "Poids: 12g", statut: "perdu", token: "ST-CI-2026-BIJ22222", dateEnregistrement: "2026-01-05" },
+  { id: 2, nom: "Moto Honda CBR", categorie: "moto", marque: "Honda", identifiant: "VIN: JH2MC130XXK000123", statut: "propre", token: "ST-CI-2026-XYZ98765", dateEnregistrement: "2026-02-01" },
+  { id: 3, nom: "MacBook Pro 16\"", categorie: "ordinateur", marque: "Apple", identifiant: "S/N: C02XL0FDJGH5", statut: "vole", token: "ST-CI-2026-MAC45678", dateEnregistrement: "2025-11-20" },
+  { id: 4, nom: "TV Samsung 55\"", categorie: "televiseur", marque: "Samsung", identifiant: "S/N: SAM55-2024-001", statut: "propre", token: "ST-CI-2026-TV11111", dateEnregistrement: "2026-02-10" },
+  { id: 5, nom: "Climatiseur LG", categorie: "electromenager", marque: "LG", identifiant: "S/N: LG-CLIM-2024", statut: "perdu", token: "ST-CI-2026-CLM22222", dateEnregistrement: "2026-01-05" },
 ];
+
+// Simulate auth - will be replaced by real auth
+const isAuthenticated = false;
 
 const MesBiens = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,7 +60,12 @@ const MesBiens = () => {
   const [qrDialog, setQrDialog] = useState<{ open: boolean; token: string; nom: string }>({ open: false, token: "", nom: "" });
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; bienId: number; bienNom: string }>({ open: false, bienId: 0, bienNom: "" });
 
-  const filtered = demoBiens.filter((b) => {
+  // Redirect to login if not authenticated
+  if (isAuthenticated === false) {
+    return <Navigate to="/connexion" replace />;
+  }
+
+  const filtered = demoAppareils.filter((b) => {
     const matchSearch = b.nom.toLowerCase().includes(searchQuery.toLowerCase()) || b.identifiant.toLowerCase().includes(searchQuery.toLowerCase()) || b.marque.toLowerCase().includes(searchQuery.toLowerCase());
     const matchCat = filterCategorie === "tous" || b.categorie === filterCategorie;
     const matchStatut = filterStatut === "tous" || b.statut === filterStatut;
@@ -72,15 +78,14 @@ const MesBiens = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
-              <h1 className="font-display text-2xl md:text-3xl font-bold">Mes biens</h1>
-              <p className="text-muted-foreground">{demoBiens.length} bien(s) enregistré(s)</p>
+              <h1 className="font-display text-2xl md:text-3xl font-bold">Mes appareils et véhicules</h1>
+              <p className="text-muted-foreground">{demoAppareils.length} enregistrement(s)</p>
             </div>
             <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
-              <Link to="/enregistrer-bien"><Plus className="h-4 w-4 mr-2" /> Enregistrer un bien</Link>
+              <Link to="/enregistrer-bien"><Plus className="h-4 w-4 mr-2" /> Enregistrer</Link>
             </Button>
           </div>
 
-          {/* Filters */}
           <Card className="mb-6">
             <CardContent className="p-4">
               <div className="flex flex-col md:flex-row gap-3">
@@ -96,11 +101,11 @@ const MesBiens = () => {
                   <SelectContent>
                     <SelectItem value="tous">Toutes catégories</SelectItem>
                     <SelectItem value="telephone">Téléphones</SelectItem>
-                    <SelectItem value="vehicule">Véhicules</SelectItem>
-                    <SelectItem value="informatique">Informatique</SelectItem>
-                    <SelectItem value="energie">Énergie</SelectItem>
-                    <SelectItem value="bijoux">Bijoux</SelectItem>
+                    <SelectItem value="ordinateur">Ordinateurs</SelectItem>
+                    <SelectItem value="televiseur">Téléviseurs</SelectItem>
                     <SelectItem value="electromenager">Électroménager</SelectItem>
+                    <SelectItem value="voiture">Voitures</SelectItem>
+                    <SelectItem value="moto">Motos</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={filterStatut} onValueChange={setFilterStatut}>
@@ -120,27 +125,21 @@ const MesBiens = () => {
             </CardContent>
           </Card>
 
-          {/* Results */}
           {filtered.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium">Aucun bien trouvé</p>
-                <p className="text-sm">Modifiez vos filtres ou enregistrez un nouveau bien.</p>
+                <p className="font-medium">Aucun appareil trouvé</p>
+                <p className="text-sm">Modifiez vos filtres ou enregistrez un nouvel appareil.</p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {filtered.map((bien, i) => {
-                const CatIcon = categoryIcons[bien.categorie] || Package;
-                const statut = statutConfig[bien.statut] || statutConfig.propre;
+              {filtered.map((item, i) => {
+                const CatIcon = categoryIcons[item.categorie] || Package;
+                const statut = statutConfig[item.statut] || statutConfig.propre;
                 return (
-                  <motion.div
-                    key={bien.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                  >
+                  <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                     <Card className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between gap-4">
@@ -149,22 +148,22 @@ const MesBiens = () => {
                               <CatIcon className="h-5 w-5 text-primary" />
                             </div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">{bien.nom}</div>
-                              <div className="text-sm text-muted-foreground truncate">{bien.marque} · {bien.identifiant}</div>
+                              <div className="font-display font-semibold truncate">{item.nom}</div>
+                              <div className="text-sm text-muted-foreground truncate">{item.marque} · {item.identifiant}</div>
                               <div className="text-xs text-muted-foreground mt-0.5">
-                                {categoryLabels[bien.categorie]} · Enregistré le {new Date(bien.dateEnregistrement).toLocaleDateString("fr-FR")}
+                                {categoryLabels[item.categorie]} · Enregistré le {new Date(item.dateEnregistrement).toLocaleDateString("fr-FR")}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statut.bg} ${statut.text} hidden sm:inline-block`}>{statut.label}</span>
-                            <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: bien.token, nom: bien.nom })} title="QR Code">
+                            <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: item.nom })} title="QR Code">
                               <QrCode className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienId: bien.id, bienNom: bien.nom })} title="Transférer">
+                            <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienId: item.id, bienNom: item.nom })} title="Transférer">
                               <ArrowRightLeft className="h-4 w-4" />
                             </Button>
-                            {bien.statut === "propre" && (
+                            {item.statut === "propre" && (
                               <Button variant="ghost" size="icon" asChild title="Signaler">
                                 <Link to="/signaler"><AlertTriangle className="h-4 w-4 text-destructive" /></Link>
                               </Button>

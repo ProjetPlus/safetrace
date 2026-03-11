@@ -20,28 +20,28 @@ interface ScanData {
 const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string }> = {
   propre: {
     icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200",
-    title: "✅ Bien propre — Aucun signalement",
-    desc: "Ce bien est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute sécurité."
+    title: "✅ Appareil propre — Aucun signalement",
+    desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute sécurité."
   },
   vole: {
     icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300",
-    title: "🔴 ATTENTION — Bien signalé VOLÉ",
-    desc: "Ce bien a été signalé volé par son propriétaire. N'achetez PAS ce bien. Contactez les autorités ou le propriétaire."
+    title: "🔴 ATTENTION — Appareil signalé VOLÉ",
+    desc: "Cet appareil a été signalé volé par son propriétaire. N'achetez PAS cet appareil. Contactez les autorités ou le propriétaire."
   },
   perdu: {
     icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200",
-    title: "🟡 Bien signalé PERDU",
-    desc: "Ce bien a été déclaré perdu par son propriétaire. Si vous l'avez trouvé, contactez-le."
+    title: "🟡 Appareil signalé PERDU",
+    desc: "Cet appareil a été déclaré perdu par son propriétaire. Si vous l'avez trouvé, contactez-le."
   },
   enquete: {
     icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200",
-    title: "🔵 Bien en cours d'enquête",
-    desc: "Ce bien fait l'objet d'une enquête en cours. Il est déconseillé de l'acheter."
+    title: "🔵 Appareil en cours d'enquête",
+    desc: "Cet appareil fait l'objet d'une enquête en cours. Il est déconseillé de l'acheter."
   },
   non_enregistre: {
     icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200",
-    title: "⚪ Bien non enregistré",
-    desc: "Ce bien n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé, mais la prudence est recommandée."
+    title: "⚪ Appareil non enregistré",
+    desc: "Cet appareil n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé, mais la prudence est recommandée."
   },
 };
 
@@ -51,16 +51,14 @@ const ScanResult = () => {
   const [data, setData] = useState<ScanData | null>(null);
 
   useEffect(() => {
-    // Simulate API call — will be replaced by Supabase query
     const timer = setTimeout(() => {
       if (token?.startsWith("ST-CI-")) {
-        // Demo: simulate different statuses based on token
         const hash = token.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
         const statuses: ScanStatus[] = ["propre", "vole", "perdu", "enquete"];
         const status = statuses[hash % statuses.length];
         setData({
           status,
-          nom: "Bien enregistré",
+          nom: "Appareil enregistré",
           categorie: "Téléphone",
           marque: "Samsung",
           dateEnregistrement: "2026-01-15",

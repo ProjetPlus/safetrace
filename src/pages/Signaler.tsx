@@ -16,7 +16,7 @@ const Signaler = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [bien, setBien] = useState("");
+  const [appareil, setAppareil] = useState("");
   const [typeIncident, setTypeIncident] = useState("");
   const [date, setDate] = useState("");
   const [heure, setHeure] = useState("");
@@ -26,7 +26,7 @@ const Signaler = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bien) { toast({ title: "Erreur", description: "Veuillez sélectionner un bien.", variant: "destructive" }); return; }
+    if (!appareil) { toast({ title: "Erreur", description: "Veuillez sélectionner un appareil.", variant: "destructive" }); return; }
     if (!typeIncident) { toast({ title: "Erreur", description: "Veuillez choisir le type d'incident.", variant: "destructive" }); return; }
     if (!date) { toast({ title: "Erreur", description: "Veuillez indiquer la date de l'incident.", variant: "destructive" }); return; }
 
@@ -62,9 +62,9 @@ const Signaler = () => {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-1.5">
-                    <Label>Bien concerné *</Label>
-                    <Select value={bien} onValueChange={setBien}>
-                      <SelectTrigger><SelectValue placeholder="Sélectionner un bien enregistré" /></SelectTrigger>
+                    <Label>Appareil ou véhicule concerné *</Label>
+                    <Select value={appareil} onValueChange={setAppareil}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner un appareil enregistré" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="1">iPhone 14 Pro — IMEI: 352789102345678</SelectItem>
                         <SelectItem value="2">Moto Honda — VIN: JH2MC130XXK000123</SelectItem>
@@ -95,7 +95,6 @@ const Signaler = () => {
                     </div>
                   </div>
 
-                  {/* Lieu */}
                   <LocationSelector value={location} onChange={setLocation} />
 
                   <div className="space-y-1.5">

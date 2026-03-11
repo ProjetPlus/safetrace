@@ -34,7 +34,6 @@ const Inscription = () => {
     if (!password || password.length < 8) { toast({ title: "Erreur", description: "Le mot de passe doit contenir au moins 8 caractères.", variant: "destructive" }); return; }
 
     setLoading(true);
-    // Simulate account creation - will be connected to Supabase
     setTimeout(() => {
       setLoading(false);
       toast({ title: "✅ Compte créé avec succès !", description: "Bienvenue sur SafeTrace ! Connectez-vous pour commencer." });
@@ -53,7 +52,7 @@ const Inscription = () => {
                   <UserPlus className="h-7 w-7 text-safe-green" />
                 </div>
                 <CardTitle className="font-display text-2xl">Créer un compte</CardTitle>
-                <CardDescription>Inscription gratuite — protégez vos biens</CardDescription>
+                <CardDescription>Inscription gratuite — protégez vos appareils et véhicules</CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +93,6 @@ const Inscription = () => {
                     </div>
                   </div>
 
-                  {/* Contact de secours */}
                   <div className="border-t pt-4 mt-4">
                     <Label className="text-sm font-display font-semibold text-muted-foreground mb-3 block">Informations complémentaires (optionnel)</Label>
                     <div className="space-y-3">
@@ -119,7 +117,6 @@ const Inscription = () => {
                     </div>
                   </div>
 
-                  {/* Localisation */}
                   <LocationSelector value={location} onChange={setLocation} />
 
                   <Button type="submit" className="w-full bg-safe-green hover:bg-safe-green/90 text-white" size="lg" disabled={loading}>

@@ -13,27 +13,30 @@ const APropos = () => (
     <section className="py-16 md:py-24 bg-gradient-to-b from-safe-bg-blue to-background">
       <div className="container mx-auto px-4 max-w-3xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-          <h1 className="font-display text-3xl md:text-4xl font-bold mb-4">À propos de SafeTrace</h1>
+          <h1 className="font-display text-3xl md:text-4xl font-bold mb-4">Pourquoi SafeTrace ?</h1>
           <p className="text-muted-foreground text-lg">
-            Initiative citoyenne pour la protection des biens en Côte d'Ivoire
+            Plateforme de traçabilité des appareils et véhicules en Côte d'Ivoire
           </p>
         </motion.div>
 
         <div className="prose prose-lg max-w-none mb-12">
           <motion.p initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-muted-foreground leading-relaxed">
-            SafeTrace est née d'un constat simple : chaque jour, des milliers d'Ivoiriens sont victimes de vol de téléphones, motos, véhicules et autres biens de valeur. La plupart de ces biens ne sont jamais retrouvés, faute d'un système centralisé de traçabilité.
+            Chaque jour en Côte d'Ivoire, des téléphones, ordinateurs, téléviseurs, électroménagers, motos et voitures sont volés — et rarement retrouvés, faute d'un registre centralisé.
           </motion.p>
           <motion.p initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={1} className="text-muted-foreground leading-relaxed mt-4">
-            Notre mission est de créer la première base de données nationale permettant à chaque citoyen d'enregistrer ses biens, de les signaler en cas de vol ou perte, et à tout acheteur de vérifier un bien avant achat.
+            SafeTrace comble ce vide. Notre plateforme permet à tout propriétaire d'enregistrer ses appareils et véhicules par numéro de série, et à tout acheteur de vérifier l'historique d'un objet avant de conclure une transaction.
+          </motion.p>
+          <motion.p initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={2} className="text-muted-foreground leading-relaxed mt-4">
+            Un outil simple, fiable et accessible à tous — conçu pour renforcer la sécurité des transactions et lutter contre la revente d'objets volés.
           </motion.p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           {[
-            { icon: Shield, title: "Protection", desc: "Chaque bien enregistré reçoit un QR code unique traçable." },
-            { icon: Users, title: "Communautaire", desc: "Les citoyens et institutions collaborent pour retrouver les biens." },
-            { icon: Globe, title: "Accessible", desc: "Gratuit pour tous, accessible depuis n'importe quel appareil." },
-            { icon: Heart, title: "Citoyen", desc: "Une initiative au service de la communauté ivoirienne." },
+            { icon: Shield, title: "Traçabilité garantie", desc: "Chaque appareil ou véhicule enregistré reçoit un identifiant unique et un QR code vérifiable." },
+            { icon: Users, title: "Réseau de confiance", desc: "Particuliers, commerçants et forces de sécurité collaborent sur une même base de données fiable." },
+            { icon: Globe, title: "Accessible partout", desc: "Depuis un smartphone, une tablette ou un ordinateur — sans contrainte technique." },
+            { icon: Heart, title: "Service professionnel", desc: "SafeTrace est un acteur ivoirien du numérique engagé au service de la sécurité des transactions." },
           ].map((item, i) => (
             <motion.div key={item.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
               <Card>
