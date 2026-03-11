@@ -7,7 +7,7 @@ import safetraceLogo from "@/assets/safetrace-logo.jpg";
 const navLinks = [
   { to: "/", label: "Accueil" },
   { to: "/scanner", label: "Scanner", icon: ScanLine },
-  { to: "/mes-biens", label: "Mes biens" },
+  { to: "/mes-biens", label: "Mes appareils" },
   { to: "/a-propos", label: "À propos" },
   { to: "/contact", label: "Contact" },
 ];
@@ -20,12 +20,10 @@ const Navbar = () => {
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-xl border-b border-border">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
             <img src={safetraceLogo} alt="SafeTrace" className="h-10 w-auto rounded-lg" />
           </Link>
 
-          {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
@@ -42,7 +40,6 @@ const Navbar = () => {
             ))}
           </div>
 
-          {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-2">
             <Button variant="ghost" asChild>
               <Link to="/connexion">
@@ -58,7 +55,6 @@ const Navbar = () => {
             </Button>
           </div>
 
-          {/* Mobile toggle */}
           <button
             className="md:hidden p-2 rounded-lg hover:bg-muted"
             onClick={() => setIsOpen(!isOpen)}
@@ -68,7 +64,6 @@ const Navbar = () => {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {isOpen && (
           <div className="md:hidden pb-4 border-t border-border mt-2 pt-4 space-y-2">
             {navLinks.map((link) => (

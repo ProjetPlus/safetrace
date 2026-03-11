@@ -26,7 +26,6 @@ const Scanner = () => {
     return "";
   };
 
-  // Algorithme de Luhn pour validation IMEI
   const validateLuhn = (num: string): boolean => {
     let sum = 0;
     for (let i = 0; i < num.length; i++) {
@@ -40,19 +39,13 @@ const Scanner = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) { toast({ title: "Erreur", description: "Veuillez saisir un identifiant.", variant: "destructive" }); return; }
-
-    // IMEI validation
     if (/^\d{14,16}$/.test(query) && !validateLuhn(query)) {
       toast({ title: "IMEI invalide", description: "Ce numéro IMEI ne passe pas la validation Luhn.", variant: "destructive" });
     }
-
     setLoading(true);
     setSearched(true);
-
-    // Simulate search - will be connected to Supabase
     setTimeout(() => {
       setLoading(false);
-      // Demo: randomly show different results
       const rand = Math.random();
       if (rand < 0.3) setResult("propre");
       else if (rand < 0.5) setResult("vole");
@@ -62,10 +55,10 @@ const Scanner = () => {
   };
 
   const resultDisplay = {
-    propre: { icon: CheckCircle2, bg: "bg-green-50 border-green-200", iconColor: "text-green-600", title: "✅ Bien propre", desc: "Ce bien est enregistré et aucun signalement n'est actif." },
-    vole: { icon: AlertTriangle, bg: "bg-red-50 border-red-200", iconColor: "text-red-600", title: "🔴 Signalé VOLÉ", desc: "ATTENTION — Ce bien a été signalé volé. Ne l'achetez pas. Contactez le propriétaire ou les autorités." },
-    perdu: { icon: AlertTriangle, bg: "bg-yellow-50 border-yellow-200", iconColor: "text-yellow-600", title: "🟡 Signalé PERDU", desc: "Ce bien a été déclaré perdu par son propriétaire." },
-    non_enregistre: { icon: XCircle, bg: "bg-gray-50 border-gray-200", iconColor: "text-gray-500", title: "⚪ Non enregistré", desc: "Ce bien n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé." },
+    propre: { icon: CheckCircle2, bg: "bg-green-50 border-green-200", iconColor: "text-green-600", title: "✅ Appareil propre", desc: "Cet appareil est enregistré et aucun signalement n'est actif." },
+    vole: { icon: AlertTriangle, bg: "bg-red-50 border-red-200", iconColor: "text-red-600", title: "🔴 Signalé VOLÉ", desc: "ATTENTION — Cet appareil a été signalé volé. Ne l'achetez pas. Contactez le propriétaire ou les autorités." },
+    perdu: { icon: AlertTriangle, bg: "bg-yellow-50 border-yellow-200", iconColor: "text-yellow-600", title: "🟡 Signalé PERDU", desc: "Cet appareil a été déclaré perdu par son propriétaire." },
+    non_enregistre: { icon: XCircle, bg: "bg-gray-50 border-gray-200", iconColor: "text-gray-500", title: "⚪ Non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé." },
   };
 
   return (
@@ -77,7 +70,7 @@ const Scanner = () => {
               <ScanLine className="h-10 w-10 text-safe-green" />
             </div>
             <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-3">Scanner Universel</h1>
-            <p className="text-muted-foreground text-lg">Vérifiez n'importe quel bien — aucun compte requis</p>
+            <p className="text-muted-foreground text-lg">Vérifiez n'importe quel appareil ou véhicule — gratuit, aucun compte requis</p>
           </motion.div>
 
           <div className="flex gap-2 justify-center mb-8">
@@ -105,13 +98,12 @@ const Scanner = () => {
                     )}
                     <Button type="submit" size="lg" className="w-full bg-safe-green hover:bg-safe-green/90 text-white text-lg" disabled={loading}>
                       <Search className="h-5 w-5 mr-2" />
-                      {loading ? "Vérification en cours…" : "Vérifier ce bien"}
+                      {loading ? "Vérification en cours…" : "Vérifier cet appareil"}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
 
-              {/* Result */}
               {searched && result && !loading && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
                   <Card className={`border-2 ${resultDisplay[result].bg}`}>
@@ -136,7 +128,7 @@ const Scanner = () => {
                 <CardContent className="p-12 text-center">
                   <Camera className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                   <p className="text-muted-foreground mb-4">
-                    Le scanner caméra sera activé avec l'intégration Supabase.<br />
+                    Le scanner caméra sera activé prochainement.<br />
                     Utilisez la saisie manuelle en attendant.
                   </p>
                   <Button variant="outline" onClick={() => setMode("manual")}>Passer en saisie manuelle</Button>
