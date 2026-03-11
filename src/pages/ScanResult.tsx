@@ -1,0 +1,147 @@
+import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Shield, CheckCircle2, AlertTriangle, XCircle, ScanLine, ArrowLeft, Phone, MapPin } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import Layout from "@/components/layout/Layout";
+import { motion } from "framer-motion";
+
+type ScanStatus = "propre" | "vole" | "perdu" | "enquete" | "non_enregistre";
+
+interface ScanData {
+  status: ScanStatus;
+  nom?: string;
+  categorie?: string;
+  marque?: string;
+  dateEnregistrement?: string;
+  region?: string;
+}
+
+const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string }> = {
+  propre: {
+    icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200",
+    title: "✅ Bien propre — Aucun signalement",
+    desc: "Ce bien est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute sécurité."
+  },
+  vole: {
+    icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300",
+    title: "🔴 ATTENTION — Bien signalé VOLÉ",
+    desc: "Ce bien a été signalé volé par son propriétaire. N'achetez PAS ce bien. Contactez les autorités ou le propriétaire."
+  },
+  perdu: {
+    icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200",
+    title: "🟡 Bien signalé PERDU",
+    desc: "Ce bien a été déclaré perdu par son propriétaire. Si vous l'avez trouvé, contactez-le."
+  },
+  enquete: {
+    icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200",
+    title: "🔵 Bien en cours d'enquête",
+    desc: "Ce bien fait l'objet d'une enquête en cours. Il est déconseillé de l'acheter."
+  },
+  non_enregistre: {
+    icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200",
+    title: "⚪ Bien non enregistré",
+    desc: "Ce bien n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé, mais la prudence est recommandée."
+  },
+};
+
+const ScanResult = () => {
+  const { token } = useParams<{ token: string }>();
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<ScanData | null>(null);
+
+  useEffect(() => {
+    // Simulate API call — will be replaced by Supabase query
+    const timer = setTimeout(() => {
+      if (token?.startsWith("ST-CI-")) {
+        // Demo: simulate different statuses based on token
+        const hash = token.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+        const statuses: ScanStatus[] = ["propre", "vole", "perdu", "enquete"];
+        const status = statuses[hash % statuses.length];
+        setData({
+          status,
+          nom: "Bien enregistré",
+          categorie: "Téléphone",
+          marque: "Samsung",
+          dateEnregistrement: "2026-01-15",
+          region: "Haut-Sassandra",
+        });
+      } else {
+        setData({ status: "non_enregistre" });
+      }
+      setLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [token]);
+
+  const config = data ? statusConfig[data.status] : null;
+
+  return (
+    <Layout>
+      <section className="py-16 md:py-24 bg-gradient-to-b from-safe-bg-blue to-background min-h-[80vh]">
+        <div className="container mx-auto px-4 max-w-lg">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-safe-green/10 flex items-center justify-center mx-auto mb-4">
+              <ScanLine className="h-8 w-8 text-safe-green" />
+            </div>
+            <h1 className="font-display text-2xl md:text-3xl font-bold">Résultat du scan</h1>
+            <p className="text-muted-foreground text-sm mt-1 font-mono">{token}</p>
+          </motion.div>
+
+          {loading ? (
+            <Card className="border-2">
+              <CardContent className="p-12 text-center">
+                <div className="w-12 h-12 border-4 border-safe-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">Vérification en cours…</p>
+              </CardContent>
+            </Card>
+          ) : config && data ? (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+              <Card className={`border-2 ${config.borderColor} ${config.bg}`}>
+                <CardContent className="p-8 text-center">
+                  {(() => { const Icon = config.icon; return <Icon className={`h-16 w-16 mx-auto mb-4 ${config.iconColor}`} />; })()}
+                  <h2 className="font-display text-xl md:text-2xl font-bold mb-3">{config.title}</h2>
+                  <p className="text-muted-foreground mb-6">{config.desc}</p>
+
+                  {data.status !== "non_enregistre" && (
+                    <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mb-6 border">
+                      {data.categorie && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Catégorie</span><span className="font-medium">{data.categorie}</span></div>}
+                      {data.marque && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Marque</span><span className="font-medium">{data.marque}</span></div>}
+                      {data.region && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />Région</span>
+                          <span className="font-medium">{data.region}</span>
+                        </div>
+                      )}
+                      {data.dateEnregistrement && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Enregistré le</span><span className="font-medium">{new Date(data.dateEnregistrement).toLocaleDateString("fr-FR")}</span></div>}
+                    </div>
+                  )}
+
+                  {(data.status === "vole" || data.status === "perdu") && (
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button className="bg-safe-green hover:bg-safe-green/90 text-white">
+                        <Phone className="h-4 w-4 mr-2" /> Contacter le propriétaire
+                      </Button>
+                      <Button variant="outline">Signaler aux autorités</Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : null}
+
+          <div className="flex gap-3 mt-8 justify-center">
+            <Button variant="outline" asChild>
+              <Link to="/scanner"><ArrowLeft className="h-4 w-4 mr-2" /> Nouveau scan</Link>
+            </Button>
+            <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
+              <Link to="/inscription">S'inscrire gratuitement</Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+    </Layout>
+  );
+};
+
+export default ScanResult;
