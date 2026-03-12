@@ -1,1 +1,7 @@
 project_id = "ofwitpkgxhgrdwzaidbg"
+
+[functions.wave-payment]
+verify_jwt = false
+
+[functions.wave-webhook]
+verify_jwt = false
