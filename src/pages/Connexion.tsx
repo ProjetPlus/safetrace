@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, User, Eye, EyeOff } from "lucide-react";
+import { LogIn, Phone, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,35 +8,27 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
 
 const Connexion = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { signIn, profile, isAdmin } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [username, setUsername] = useState("");
+  const [identifiant, setIdentifiant] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username) { toast({ title: "Erreur", description: "Veuillez saisir votre nom d'utilisateur.", variant: "destructive" }); return; }
+    if (!identifiant) { toast({ title: "Erreur", description: "Veuillez saisir votre identifiant.", variant: "destructive" }); return; }
     if (!password) { toast({ title: "Erreur", description: "Veuillez saisir votre mot de passe.", variant: "destructive" }); return; }
 
     setLoading(true);
-    const { error } = await signIn(username, password);
-    setLoading(false);
-
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
+    // Simulate login - will be connected to Supabase
+    setTimeout(() => {
+      setLoading(false);
       toast({ title: "✅ Connexion réussie", description: "Bienvenue sur SafeTrace !" });
-      // Redirect will happen after profile loads - use a small delay
-      setTimeout(() => {
-        navigate("/tableau-de-bord");
-      }, 500);
-    }
+      navigate("/tableau-de-bord");
+    }, 1000);
   };
 
   return (
@@ -55,10 +47,10 @@ const Connexion = () => {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="username">Nom d'utilisateur</Label>
+                    <Label htmlFor="identifiant">WhatsApp ou Email</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="mon_nom_utilisateur" className="pl-10" />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input id="identifiant" value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} placeholder="+225 07... ou email" className="pl-10" />
                     </div>
                   </div>
 

@@ -11,71 +11,36 @@ import LocationSelector from "@/components/LocationSelector";
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { useEffect } from "react";
 
 const Signaler = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [appareil, setAppareil] = useState("");
-  const [appareils, setAppareils] = useState<any[]>([]);
   const [typeIncident, setTypeIncident] = useState("");
   const [date, setDate] = useState("");
   const [heure, setHeure] = useState("");
   const [circonstances, setCirconstances] = useState("");
   const [location, setLocation] = useState({ village: "", sousPrefecture: "", departement: "", region: "", district: "" });
+  const [photoplainte, setPhotoplainte] = useState<File | null>(null);
 
-  useEffect(() => {
-    if (user) loadDevices();
-  }, [user]);
-
-  const loadDevices = async () => {
-    const { data } = await supabase.from("devices").select("id, marque, modele, token, categorie").eq("statut", "propre");
-    setAppareils(data || []);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    if (!appareil) { toast({ title: "Erreur", description: "Sélectionnez un appareil.", variant: "destructive" }); return; }
-    if (!typeIncident) { toast({ title: "Erreur", description: "Choisissez le type d'incident.", variant: "destructive" }); return; }
-    if (!date) { toast({ title: "Erreur", description: "Indiquez la date.", variant: "destructive" }); return; }
+    if (!appareil) { toast({ title: "Erreur", description: "Veuillez sélectionner un appareil.", variant: "destructive" }); return; }
+    if (!typeIncident) { toast({ title: "Erreur", description: "Veuillez choisir le type d'incident.", variant: "destructive" }); return; }
+    if (!date) { toast({ title: "Erreur", description: "Veuillez indiquer la date de l'incident.", variant: "destructive" }); return; }
 
     setLoading(true);
     const numDossier = `SF-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-    const { error } = await supabase.from("reports").insert({
-      device_id: appareil,
-      user_id: user.id,
-      type_incident: typeIncident as any,
-      date_incident: date,
-      heure_incident: heure || null,
-      circonstances: circonstances || null,
-      village: location.village || null,
-      sous_prefecture: location.sousPrefecture || null,
-      departement: location.departement || null,
-      region: location.region || null,
-      district: location.district || null,
-      numero_dossier: numDossier,
-    });
-
-    if (!error) {
-      // Update device status
-      const newStatut = typeIncident === "vol" ? "vole" : typeIncident === "perte" ? "perdu" : "propre";
-      await supabase.from("devices").update({ statut: newStatut }).eq("id", appareil);
-    }
-
-    setLoading(false);
-
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "🔴 Signalement enregistré", description: `Dossier N° ${numDossier}` });
+    setTimeout(() => {
+      setLoading(false);
+      toast({
+        title: "🔴 Signalement enregistré",
+        description: `Dossier N° ${numDossier} — Les autorités de votre zone ont été notifiées.`,
+      });
       navigate("/tableau-de-bord");
-    }
+    }, 1500);
   };
 
   return (
@@ -83,7 +48,7 @@ const Signaler = () => {
       <section className="py-8 md:py-16 bg-gradient-to-b from-safe-bg-blue to-background min-h-[80vh]">
         <div className="container mx-auto px-4 max-w-2xl">
           <Button variant="ghost" asChild className="mb-4">
-            <Link to="/tableau-de-bord"><ArrowLeft className="h-4 w-4 mr-2" /> Retour</Link>
+            <Link to="/tableau-de-bord"><ArrowLeft className="h-4 w-4 mr-2" /> Retour au tableau de bord</Link>
           </Button>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -97,13 +62,12 @@ const Signaler = () => {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-1.5">
-                    <Label>Appareil ou véhicule *</Label>
+                    <Label>Appareil ou véhicule concerné *</Label>
                     <Select value={appareil} onValueChange={setAppareil}>
-                      <SelectTrigger><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner un appareil enregistré" /></SelectTrigger>
                       <SelectContent>
-                        {appareils.map((a) => (
-                          <SelectItem key={a.id} value={a.id}>{a.marque} {a.modele} — {a.token}</SelectItem>
-                        ))}
+                        <SelectItem value="1">iPhone 14 Pro — IMEI: 352789102345678</SelectItem>
+                        <SelectItem value="2">Moto Honda — VIN: JH2MC130XXK000123</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -121,15 +85,31 @@ const Signaler = () => {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5"><Label>Date *</Label><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
-                    <div className="space-y-1.5"><Label>Heure</Label><Input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <Label>Date de l'incident *</Label>
+                      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Heure approximative</Label>
+                      <Input type="time" value={heure} onChange={(e) => setHeure(e.target.value)} />
+                    </div>
                   </div>
 
                   <LocationSelector value={location} onChange={setLocation} />
 
                   <div className="space-y-1.5">
                     <Label>Circonstances</Label>
-                    <Textarea value={circonstances} onChange={(e) => setCirconstances(e.target.value)} rows={4} />
+                    <Textarea value={circonstances} onChange={(e) => setCirconstances(e.target.value)} placeholder="Décrivez les circonstances du vol ou de la perte…" rows={4} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Photo du dépôt de plainte (optionnel)</Label>
+                    <label className="border-2 border-dashed rounded-xl p-6 text-center text-muted-foreground cursor-pointer hover:border-destructive/30 transition-colors block">
+                      <FileText className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Joindre la photo du PV de plainte</p>
+                      {photoplainte && <p className="text-xs text-safe-green mt-1">{photoplainte.name}</p>}
+                      <input type="file" accept="image/*" onChange={(e) => setPhotoplainte(e.target.files?.[0] || null)} className="hidden" />
+                    </label>
                   </div>
 
                   <div className="bg-destructive/5 border border-destructive/20 rounded-xl p-4">
@@ -138,7 +118,7 @@ const Signaler = () => {
 
                   <Button type="submit" className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground" size="lg" disabled={loading}>
                     <AlertTriangle className="h-4 w-4 mr-2" />
-                    {loading ? "Envoi…" : "Confirmer le signalement"}
+                    {loading ? "Envoi en cours…" : "Confirmer le signalement"}
                   </Button>
                 </form>
               </CardContent>
