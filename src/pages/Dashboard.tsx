@@ -1,12 +1,14 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Plus, ScanLine, Package, AlertTriangle, QrCode, Bell, ArrowRightLeft, List } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Plus, ScanLine, Package, AlertTriangle, QrCode, Bell, ArrowRightLeft, List, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
 import QRCodeGenerator from "@/components/QRCodeGenerator";
 import TransferDialog from "@/components/TransferDialog";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +17,34 @@ import {
 } from "@/components/ui/dialog";
 
 const Dashboard = () => {
+  const { profile, isAdmin, signOut } = useAuth();
+  const navigate = useNavigate();
   const [qrDialog, setQrDialog] = useState<{ open: boolean; token: string; nom: string }>({ open: false, token: "", nom: "" });
   const [transferDialog, setTransferDialog] = useState<{ open: boolean; bienNom: string }>({ open: false, bienNom: "" });
+  const [appareils, setAppareils] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState({ devices: 0, reports: 0, notifications: 0 });
 
-  const appareils = [
-    { id: 1, nom: "iPhone 14 Pro", type: "Téléphone", identifiant: "IMEI: 352789102345678", statut: "propre", token: "ST-CI-2026-ABC12345" },
-    { id: 2, nom: "Moto Honda CBR", type: "Moto", identifiant: "VIN: JH2MC130XXK000123", statut: "propre", token: "ST-CI-2026-XYZ98765" },
-  ];
+  useEffect(() => {
+    if (isAdmin) {
+      navigate("/admin", { replace: true });
+      return;
+    }
+    loadDevices();
+  }, [isAdmin]);
+
+  const loadDevices = async () => {
+    const { data } = await supabase
+      .from("devices")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(5);
+    setAppareils(data || []);
+
+    const { count: devCount } = await supabase.from("devices").select("*", { count: "exact", head: true });
+    const { count: repCount } = await supabase.from("reports").select("*", { count: "exact", head: true });
+    const { count: notifCount } = await supabase.from("notifications").select("*", { count: "exact", head: true }).eq("is_read", false);
+    setStatsData({ devices: devCount || 0, reports: repCount || 0, notifications: notifCount || 0 });
+  };
 
   const getStatutBadge = (statut: string) => {
     const map: Record<string, { bg: string; text: string; label: string }> = {
@@ -41,10 +64,14 @@ const Dashboard = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
-              <h1 className="font-display text-2xl md:text-3xl font-bold">Tableau de bord</h1>
-              <p className="text-muted-foreground">Gérez et protégez vos appareils et véhicules</p>
+              <h1 className="font-display text-2xl md:text-3xl font-bold">
+                Bienvenue{profile ? `, ${profile.prenoms}` : ""} 👋
+              </h1>
+              <p className="text-muted-foreground">
+                @{profile?.username} · Gérez et protégez vos appareils et véhicules
+              </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
                 <Link to="/enregistrer-bien"><Plus className="h-4 w-4 mr-2" /> Enregistrer</Link>
               </Button>
@@ -52,17 +79,23 @@ const Dashboard = () => {
                 <Link to="/scanner"><ScanLine className="h-4 w-4 mr-2" /> Scanner</Link>
               </Button>
               <Button variant="outline" asChild>
-                <Link to="/mes-biens"><List className="h-4 w-4 mr-2" /> Tous mes appareils</Link>
+                <Link to="/mes-appareils"><List className="h-4 w-4 mr-2" /> Tous mes appareils</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/profil"><User className="h-4 w-4 mr-2" /> Profil</Link>
+              </Button>
+              <Button variant="ghost" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-2" /> Déconnexion
               </Button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             {[
-              { icon: Package, label: "Appareils enregistrés", value: String(appareils.length), color: "text-primary" },
-              { icon: AlertTriangle, label: "Signalements actifs", value: "0", color: "text-destructive" },
-              { icon: QrCode, label: "QR Codes générés", value: String(appareils.length), color: "text-safe-green" },
-              { icon: Bell, label: "Notifications", value: "0", color: "text-muted-foreground" },
+              { icon: Package, label: "Appareils enregistrés", value: String(statsData.devices), color: "text-primary" },
+              { icon: AlertTriangle, label: "Signalements actifs", value: String(statsData.reports), color: "text-destructive" },
+              { icon: QrCode, label: "QR Codes générés", value: String(statsData.devices), color: "text-safe-green" },
+              { icon: Bell, label: "Notifications", value: String(statsData.notifications), color: "text-muted-foreground" },
             ].map((s) => (
               <Card key={s.label}>
                 <CardContent className="p-4 text-center">
@@ -104,16 +137,16 @@ const Dashboard = () => {
                           <Package className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <div className="font-medium">{item.nom}</div>
-                          <div className="text-sm text-muted-foreground">{item.type} · {item.identifiant}</div>
+                          <div className="font-medium">{item.marque} {item.modele}</div>
+                          <div className="text-sm text-muted-foreground">{item.categorie} · {item.token}</div>
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
                         {getStatutBadge(item.statut)}
-                        <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: item.nom })} title="Voir QR Code">
+                        <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: `${item.marque} ${item.modele}` })}>
                           <QrCode className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienNom: item.nom })} title="Transférer">
+                        <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienNom: `${item.marque} ${item.modele}` })}>
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
                       </div>
