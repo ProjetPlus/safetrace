@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => ({
       includeAssets: ["favicon.ico", "images/safetrace-logo.jpg"],
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp}"],
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
           {
@@ -41,9 +42,9 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       manifest: {
-        name: "SafeTrace — Identifie. Protège. Retrouve.",
+        name: "SafeTrace — Enregistrez. Protégez. Vérifiez.",
         short_name: "SafeTrace",
-        description: "Plateforme nationale de traçabilité et protection des biens en Côte d'Ivoire",
+        description: "Plateforme de traçabilité des appareils et véhicules en Côte d'Ivoire",
         theme_color: "#1B3A6B",
         background_color: "#EBF0FA",
         display: "standalone",

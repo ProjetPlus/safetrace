@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { LogIn, Phone, Eye, EyeOff } from "lucide-react";
+import { LogIn, User, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,27 +8,39 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Connexion = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signIn, user } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [identifiant, setIdentifiant] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already logged in
+  if (user) {
+    navigate("/tableau-de-bord", { replace: true });
+    return null;
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!identifiant) { toast({ title: "Erreur", description: "Veuillez saisir votre identifiant.", variant: "destructive" }); return; }
+    if (!username) { toast({ title: "Erreur", description: "Veuillez saisir votre nom d'utilisateur.", variant: "destructive" }); return; }
     if (!password) { toast({ title: "Erreur", description: "Veuillez saisir votre mot de passe.", variant: "destructive" }); return; }
 
     setLoading(true);
-    // Simulate login - will be connected to Supabase
-    setTimeout(() => {
-      setLoading(false);
-      toast({ title: "✅ Connexion réussie", description: "Bienvenue sur SafeTrace !" });
-      navigate("/tableau-de-bord");
-    }, 1000);
+    const { error } = await signIn(username, password);
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Erreur de connexion", description: error.message || "Identifiants incorrects.", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "✅ Connexion réussie", description: "Bienvenue sur SafeTrace !" });
+    navigate("/tableau-de-bord");
   };
 
   return (
@@ -47,17 +59,17 @@ const Connexion = () => {
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="identifiant">WhatsApp ou Email</Label>
+                    <Label htmlFor="username">Nom d'utilisateur</Label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input id="identifiant" value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} placeholder="+225 07... ou email" className="pl-10" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Votre nom d'utilisateur" className="pl-10" />
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
                     <div className="flex justify-between">
                       <Label htmlFor="password">Mot de passe</Label>
-                      <Link to="#" className="text-xs text-primary hover:underline">Mot de passe oublié ?</Link>
+                      <Link to="/mot-de-passe-oublie" className="text-xs text-primary hover:underline">Mot de passe oublié ?</Link>
                     </div>
                     <div className="relative">
                       <Input id="password" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Votre mot de passe" />

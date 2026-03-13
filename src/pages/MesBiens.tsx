@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
-import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Shield, Monitor, WashingMachine } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Monitor, WashingMachine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,29 +9,15 @@ import Layout from "@/components/layout/Layout";
 import QRCodeGenerator from "@/components/QRCodeGenerator";
 import TransferDialog from "@/components/TransferDialog";
 import { motion } from "framer-motion";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 const categoryIcons: Record<string, any> = {
-  telephone: Smartphone,
-  voiture: Car,
-  moto: Car,
-  ordinateur: Laptop,
-  televiseur: Monitor,
-  electromenager: WashingMachine,
+  telephone: Smartphone, voiture: Car, moto: Car, ordinateur: Laptop, televiseur: Monitor, electromenager: WashingMachine,
 };
 
 const categoryLabels: Record<string, string> = {
-  telephone: "Téléphone",
-  voiture: "Voiture",
-  moto: "Moto",
-  ordinateur: "Ordinateur",
-  televiseur: "Téléviseur",
-  electromenager: "Électroménager",
+  telephone: "Téléphone", voiture: "Voiture", moto: "Moto", ordinateur: "Ordinateur", televiseur: "Téléviseur", electromenager: "Électroménager",
 };
 
 const statutConfig: Record<string, { bg: string; text: string; label: string }> = {
@@ -42,31 +28,47 @@ const statutConfig: Record<string, { bg: string; text: string; label: string }> 
   retrouve: { bg: "bg-emerald-100", text: "text-emerald-700", label: "🟢 Retrouvé" },
 };
 
-const demoAppareils = [
-  { id: 1, nom: "iPhone 14 Pro", categorie: "telephone", marque: "Apple", identifiant: "IMEI: 352789102345678", statut: "propre", token: "ST-CI-2026-ABC12345", dateEnregistrement: "2026-01-15" },
-  { id: 2, nom: "Moto Honda CBR", categorie: "moto", marque: "Honda", identifiant: "VIN: JH2MC130XXK000123", statut: "propre", token: "ST-CI-2026-XYZ98765", dateEnregistrement: "2026-02-01" },
-  { id: 3, nom: "MacBook Pro 16\"", categorie: "ordinateur", marque: "Apple", identifiant: "S/N: C02XL0FDJGH5", statut: "vole", token: "ST-CI-2026-MAC45678", dateEnregistrement: "2025-11-20" },
-  { id: 4, nom: "TV Samsung 55\"", categorie: "televiseur", marque: "Samsung", identifiant: "S/N: SAM55-2024-001", statut: "propre", token: "ST-CI-2026-TV11111", dateEnregistrement: "2026-02-10" },
-  { id: 5, nom: "Climatiseur LG", categorie: "electromenager", marque: "LG", identifiant: "S/N: LG-CLIM-2024", statut: "perdu", token: "ST-CI-2026-CLM22222", dateEnregistrement: "2026-01-05" },
-];
-
-// Simulate auth - will be replaced by real auth
-const isAuthenticated = false;
+interface Device {
+  id: string;
+  marque: string;
+  modele: string | null;
+  categorie: string;
+  statut: string;
+  token: string;
+  imei1: string | null;
+  num_serie: string | null;
+  chassis: string | null;
+  created_at: string;
+}
 
 const MesBiens = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategorie, setFilterCategorie] = useState("tous");
   const [filterStatut, setFilterStatut] = useState("tous");
   const [qrDialog, setQrDialog] = useState<{ open: boolean; token: string; nom: string }>({ open: false, token: "", nom: "" });
-  const [transferDialog, setTransferDialog] = useState<{ open: boolean; bienId: number; bienNom: string }>({ open: false, bienId: 0, bienNom: "" });
+  const [transferDialog, setTransferDialog] = useState<{ open: boolean; bienNom: string }>({ open: false, bienNom: "" });
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Redirect to login if not authenticated
-  if (isAuthenticated === false) {
-    return <Navigate to="/connexion" replace />;
-  }
+  useEffect(() => {
+    fetchDevices();
+    const channel = supabase
+      .channel("mes-biens")
+      .on("postgres_changes", { event: "*", schema: "public", table: "devices" }, () => fetchDevices())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
-  const filtered = demoAppareils.filter((b) => {
-    const matchSearch = b.nom.toLowerCase().includes(searchQuery.toLowerCase()) || b.identifiant.toLowerCase().includes(searchQuery.toLowerCase()) || b.marque.toLowerCase().includes(searchQuery.toLowerCase());
+  const fetchDevices = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("devices").select("id, marque, modele, categorie, statut, token, imei1, num_serie, chassis, created_at").order("created_at", { ascending: false });
+    if (data) setDevices(data);
+    setLoading(false);
+  };
+
+  const filtered = devices.filter((b) => {
+    const name = `${b.marque} ${b.modele || ""} ${b.imei1 || ""} ${b.num_serie || ""} ${b.chassis || ""}`.toLowerCase();
+    const matchSearch = name.includes(searchQuery.toLowerCase());
     const matchCat = filterCategorie === "tous" || b.categorie === filterCategorie;
     const matchStatut = filterStatut === "tous" || b.statut === filterStatut;
     return matchSearch && matchCat && matchStatut;
@@ -79,7 +81,7 @@ const MesBiens = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div>
               <h1 className="font-display text-2xl md:text-3xl font-bold">Mes appareils et véhicules</h1>
-              <p className="text-muted-foreground">{demoAppareils.length} enregistrement(s)</p>
+              <p className="text-muted-foreground">{devices.length} enregistrement(s)</p>
             </div>
             <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
               <Link to="/enregistrer-bien"><Plus className="h-4 w-4 mr-2" /> Enregistrer</Link>
@@ -94,12 +96,9 @@ const MesBiens = () => {
                   <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher par nom, marque, identifiant…" className="pl-10" />
                 </div>
                 <Select value={filterCategorie} onValueChange={setFilterCategorie}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <Filter className="h-4 w-4 mr-2" />
-                    <SelectValue placeholder="Catégorie" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-full md:w-48"><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="Catégorie" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="tous">Toutes catégories</SelectItem>
+                    <SelectItem value="tous">Toutes</SelectItem>
                     <SelectItem value="telephone">Téléphones</SelectItem>
                     <SelectItem value="ordinateur">Ordinateurs</SelectItem>
                     <SelectItem value="televiseur">Téléviseurs</SelectItem>
@@ -109,11 +108,9 @@ const MesBiens = () => {
                   </SelectContent>
                 </Select>
                 <Select value={filterStatut} onValueChange={setFilterStatut}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Statut" />
-                  </SelectTrigger>
+                  <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="Statut" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="tous">Tous les statuts</SelectItem>
+                    <SelectItem value="tous">Tous</SelectItem>
                     <SelectItem value="propre">Propre</SelectItem>
                     <SelectItem value="vole">Volé</SelectItem>
                     <SelectItem value="perdu">Perdu</SelectItem>
@@ -125,7 +122,9 @@ const MesBiens = () => {
             </CardContent>
           </Card>
 
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" /></div>
+          ) : filtered.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -138,6 +137,8 @@ const MesBiens = () => {
               {filtered.map((item, i) => {
                 const CatIcon = categoryIcons[item.categorie] || Package;
                 const statut = statutConfig[item.statut] || statutConfig.propre;
+                const name = `${item.marque}${item.modele ? ` ${item.modele}` : ""}`;
+                const identifier = item.imei1 || item.num_serie || item.chassis || item.token;
                 return (
                   <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
                     <Card className="hover:shadow-md transition-shadow">
@@ -148,19 +149,19 @@ const MesBiens = () => {
                               <CatIcon className="h-5 w-5 text-primary" />
                             </div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">{item.nom}</div>
-                              <div className="text-sm text-muted-foreground truncate">{item.marque} · {item.identifiant}</div>
+                              <div className="font-display font-semibold truncate">{name}</div>
+                              <div className="text-sm text-muted-foreground truncate">{identifier}</div>
                               <div className="text-xs text-muted-foreground mt-0.5">
-                                {categoryLabels[item.categorie]} · Enregistré le {new Date(item.dateEnregistrement).toLocaleDateString("fr-FR")}
+                                {categoryLabels[item.categorie]} · {new Date(item.created_at).toLocaleDateString("fr-FR")}
                               </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statut.bg} ${statut.text} hidden sm:inline-block`}>{statut.label}</span>
-                            <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: item.nom })} title="QR Code">
+                            <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: name })} title="QR Code">
                               <QrCode className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienId: item.id, bienNom: item.nom })} title="Transférer">
+                            <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienNom: name })} title="Transférer">
                               <ArrowRightLeft className="h-4 w-4" />
                             </Button>
                             {item.statut === "propre" && (
@@ -182,18 +183,12 @@ const MesBiens = () => {
 
       <Dialog open={qrDialog.open} onOpenChange={(open) => setQrDialog({ ...qrDialog, open })}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-display">QR Code — {qrDialog.nom}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="font-display">QR Code — {qrDialog.nom}</DialogTitle></DialogHeader>
           {qrDialog.token && <QRCodeGenerator token={qrDialog.token} bienNom={qrDialog.nom} />}
         </DialogContent>
       </Dialog>
 
-      <TransferDialog
-        open={transferDialog.open}
-        onOpenChange={(open) => setTransferDialog({ ...transferDialog, open })}
-        bienNom={transferDialog.bienNom}
-      />
+      <TransferDialog open={transferDialog.open} onOpenChange={(open) => setTransferDialog({ ...transferDialog, open })} bienNom={transferDialog.bienNom} />
     </Layout>
   );
 };
