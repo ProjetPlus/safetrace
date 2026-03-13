@@ -481,12 +481,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_email_by_username: { Args: { p_username: string }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      promote_to_admin: {
+        Args: { target_username: string }
+        Returns: undefined
       }
     }
     Enums: {

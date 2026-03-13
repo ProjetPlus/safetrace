@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Package, Smartphone, Car, Laptop, Shield, Camera, ArrowLeft, Monitor, WashingMachine } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Package, Smartphone, Car, Laptop, Camera, ArrowLeft, Monitor, WashingMachine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +12,16 @@ import LocationSelector from "@/components/LocationSelector";
 import QRCodeGenerator from "@/components/QRCodeGenerator";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const categories = [
-  { value: "telephone", label: "Téléphone / Tablette", icon: Smartphone, tarif: "200 F CFA" },
-  { value: "ordinateur", label: "Ordinateur", icon: Laptop, tarif: "500 F CFA" },
-  { value: "televiseur", label: "Téléviseur", icon: Monitor, tarif: "500 F CFA" },
-  { value: "electromenager", label: "Appareil électroménager", icon: WashingMachine, tarif: "500 F CFA" },
-  { value: "voiture", label: "Voiture / Véhicule automobile", icon: Car, tarif: "2 000 F CFA" },
-  { value: "moto", label: "Moto / Tricycle", icon: Car, tarif: "1 000 F CFA" },
+  { value: "telephone", label: "Téléphone / Tablette", icon: Smartphone, tarif: "200 F CFA", amount: 200 },
+  { value: "ordinateur", label: "Ordinateur", icon: Laptop, tarif: "500 F CFA", amount: 500 },
+  { value: "televiseur", label: "Téléviseur", icon: Monitor, tarif: "500 F CFA", amount: 500 },
+  { value: "electromenager", label: "Appareil électroménager", icon: WashingMachine, tarif: "500 F CFA", amount: 500 },
+  { value: "voiture", label: "Voiture / Véhicule automobile", icon: Car, tarif: "2 000 F CFA", amount: 2000 },
+  { value: "moto", label: "Moto / Tricycle", icon: Car, tarif: "1 000 F CFA", amount: 1000 },
 ];
 
 const generateToken = () => {
@@ -32,6 +34,8 @@ const generateToken = () => {
 
 const EnregistrerBien = () => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [categorie, setCategorie] = useState("");
   const [marque, setMarque] = useState("");
   const [modele, setModele] = useState("");
@@ -48,6 +52,7 @@ const EnregistrerBien = () => {
   const [photos, setPhotos] = useState<File[]>([]);
   const [generatedToken, setGeneratedToken] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const selectedCat = categories.find(c => c.value === categorie);
 
@@ -57,15 +62,60 @@ const EnregistrerBien = () => {
     toast({ title: `${files.length} photo(s) sélectionnée(s)` });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) { toast({ title: "Erreur", description: "Vous devez être connecté.", variant: "destructive" }); return; }
     if (!categorie) { toast({ title: "Erreur", description: "Veuillez choisir une catégorie.", variant: "destructive" }); return; }
     if (!marque) { toast({ title: "Erreur", description: "Veuillez saisir la marque.", variant: "destructive" }); return; }
     if (categorie === "telephone" && !imei1) { toast({ title: "Erreur", description: "L'IMEI 1 est obligatoire.", variant: "destructive" }); return; }
     if ((categorie === "voiture" || categorie === "moto") && !chassis) { toast({ title: "Erreur", description: "Le numéro de châssis est obligatoire.", variant: "destructive" }); return; }
     if (["ordinateur", "televiseur", "electromenager"].includes(categorie) && !numSerie) { toast({ title: "Erreur", description: "Le numéro de série est obligatoire.", variant: "destructive" }); return; }
 
+    setLoading(true);
     const token = generateToken();
+
+    // Upload photos
+    const photoUrls: string[] = [];
+    for (const photo of photos) {
+      const filePath = `${user.id}/${token}/${photo.name}`;
+      const { error: uploadError } = await supabase.storage.from("device-photos").upload(filePath, photo);
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from("device-photos").getPublicUrl(filePath);
+        photoUrls.push(urlData.publicUrl);
+      }
+    }
+
+    // Insert device
+    const { error } = await supabase.from("devices").insert({
+      user_id: user.id,
+      categorie: categorie as any,
+      marque,
+      modele: modele || null,
+      couleur: couleur || null,
+      annee_achat: annee ? parseInt(annee) : null,
+      description: description || null,
+      imei1: imei1 || null,
+      imei2: imei2 || null,
+      num_serie: numSerie || null,
+      operateur: operateur || null,
+      chassis: chassis || null,
+      plaque: plaque || null,
+      token,
+      photos: photoUrls.length > 0 ? photoUrls : null,
+      village: location.village || null,
+      sous_prefecture: location.sousPrefecture || null,
+      departement: location.departement || null,
+      region: location.region || null,
+      district: location.district || null,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      return;
+    }
+
     setGeneratedToken(token);
     setSubmitted(true);
     toast({ title: "✅ Enregistrement réussi !", description: `Code SafeTrace : ${token}` });
@@ -125,9 +175,7 @@ const EnregistrerBien = () => {
                       <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label} — {cat.tarif}
-                          </SelectItem>
+                          <SelectItem key={cat.value} value={cat.value}>{cat.label} — {cat.tarif}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -152,20 +200,11 @@ const EnregistrerBien = () => {
 
                   {categorie === "telephone" && (
                     <div className="space-y-3 p-4 bg-safe-bg-blue rounded-xl">
+                      <div className="space-y-1.5"><Label>IMEI 1 *</Label><Input value={imei1} onChange={(e) => setImei1(e.target.value)} placeholder="Tapez *#06#" /></div>
+                      <div className="space-y-1.5"><Label>IMEI 2 (dual SIM)</Label><Input value={imei2} onChange={(e) => setImei2(e.target.value)} /></div>
+                      <div className="space-y-1.5"><Label>Numéro de série</Label><Input value={numSerie} onChange={(e) => setNumSerie(e.target.value)} /></div>
                       <div className="space-y-1.5">
-                        <Label>IMEI 1 *</Label>
-                        <Input value={imei1} onChange={(e) => setImei1(e.target.value)} placeholder="Tapez *#06# pour trouver votre IMEI" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>IMEI 2 (si dual SIM)</Label>
-                        <Input value={imei2} onChange={(e) => setImei2(e.target.value)} placeholder="Optionnel" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Numéro de série</Label>
-                        <Input value={numSerie} onChange={(e) => setNumSerie(e.target.value)} placeholder="Numéro de série" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Opérateur réseau</Label>
+                        <Label>Opérateur</Label>
                         <Select value={operateur} onValueChange={setOperateur}>
                           <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
                           <SelectContent>
@@ -181,40 +220,25 @@ const EnregistrerBien = () => {
 
                   {(categorie === "voiture" || categorie === "moto") && (
                     <div className="space-y-3 p-4 bg-safe-bg-blue rounded-xl">
-                      <div className="space-y-1.5">
-                        <Label>Numéro de châssis / VIN *</Label>
-                        <Input value={chassis} onChange={(e) => setChassis(e.target.value)} placeholder="17 caractères" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label>Plaque d'immatriculation</Label>
-                        <Input value={plaque} onChange={(e) => setPlaque(e.target.value)} placeholder="Optionnel" />
-                      </div>
+                      <div className="space-y-1.5"><Label>Châssis / VIN *</Label><Input value={chassis} onChange={(e) => setChassis(e.target.value)} placeholder="17 caractères" /></div>
+                      <div className="space-y-1.5"><Label>Plaque</Label><Input value={plaque} onChange={(e) => setPlaque(e.target.value)} /></div>
                     </div>
                   )}
 
                   {["ordinateur", "televiseur", "electromenager"].includes(categorie) && (
                     <div className="space-y-3 p-4 bg-safe-bg-blue rounded-xl">
-                      <div className="space-y-1.5">
-                        <Label>Numéro de série *</Label>
-                        <Input value={numSerie} onChange={(e) => setNumSerie(e.target.value)} placeholder="Numéro de série de l'appareil" />
-                      </div>
+                      <div className="space-y-1.5"><Label>Numéro de série *</Label><Input value={numSerie} onChange={(e) => setNumSerie(e.target.value)} /></div>
                     </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label>Couleur</Label>
-                      <Input value={couleur} onChange={(e) => setCouleur(e.target.value)} placeholder="Couleur" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Année d'achat</Label>
-                      <Input type="number" value={annee} onChange={(e) => setAnnee(e.target.value)} placeholder="2024" />
-                    </div>
+                    <div className="space-y-1.5"><Label>Couleur</Label><Input value={couleur} onChange={(e) => setCouleur(e.target.value)} /></div>
+                    <div className="space-y-1.5"><Label>Année d'achat</Label><Input type="number" value={annee} onChange={(e) => setAnnee(e.target.value)} placeholder="2024" /></div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label>Description / Notes</Label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Informations supplémentaires, signes distinctifs…" rows={3} />
+                    <Label>Description</Label>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Informations supplémentaires…" rows={3} />
                   </div>
 
                   <LocationSelector value={location} onChange={setLocation} />
@@ -224,15 +248,14 @@ const EnregistrerBien = () => {
                     <label className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground cursor-pointer hover:border-safe-green/50 transition-colors block">
                       <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">Cliquez ou glissez vos photos ici</p>
-                      <p className="text-xs">JPG, PNG — max 5 photos</p>
-                      {photos.length > 0 && <p className="text-xs text-safe-green mt-2 font-medium">{photos.length} photo(s) sélectionnée(s)</p>}
+                      {photos.length > 0 && <p className="text-xs text-safe-green mt-2 font-medium">{photos.length} photo(s)</p>}
                       <input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" />
                     </label>
                   </div>
 
-                  <Button type="submit" className="w-full bg-safe-green hover:bg-safe-green/90 text-white" size="lg">
+                  <Button type="submit" className="w-full bg-safe-green hover:bg-safe-green/90 text-white" size="lg" disabled={loading}>
                     <Package className="h-4 w-4 mr-2" />
-                    Enregistrer{selectedCat ? ` — ${selectedCat.tarif}` : ""}
+                    {loading ? "Enregistrement…" : `Enregistrer${selectedCat ? ` — ${selectedCat.tarif}` : ""}`}
                   </Button>
                 </form>
               </CardContent>

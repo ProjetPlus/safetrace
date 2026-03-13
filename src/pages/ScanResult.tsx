@@ -1,48 +1,29 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Shield, CheckCircle2, AlertTriangle, XCircle, ScanLine, ArrowLeft, Phone, MapPin } from "lucide-react";
+import { Shield, CheckCircle2, AlertTriangle, XCircle, ScanLine, ArrowLeft, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 
 type ScanStatus = "propre" | "vole" | "perdu" | "enquete" | "non_enregistre";
 
 interface ScanData {
   status: ScanStatus;
-  nom?: string;
-  categorie?: string;
   marque?: string;
-  dateEnregistrement?: string;
+  modele?: string;
+  categorie?: string;
   region?: string;
+  dateEnregistrement?: string;
 }
 
 const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string }> = {
-  propre: {
-    icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200",
-    title: "✅ Appareil propre — Aucun signalement",
-    desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute sécurité."
-  },
-  vole: {
-    icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300",
-    title: "🔴 ATTENTION — Appareil signalé VOLÉ",
-    desc: "Cet appareil a été signalé volé par son propriétaire. N'achetez PAS cet appareil. Contactez les autorités ou le propriétaire."
-  },
-  perdu: {
-    icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200",
-    title: "🟡 Appareil signalé PERDU",
-    desc: "Cet appareil a été déclaré perdu par son propriétaire. Si vous l'avez trouvé, contactez-le."
-  },
-  enquete: {
-    icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200",
-    title: "🔵 Appareil en cours d'enquête",
-    desc: "Cet appareil fait l'objet d'une enquête en cours. Il est déconseillé de l'acheter."
-  },
-  non_enregistre: {
-    icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200",
-    title: "⚪ Appareil non enregistré",
-    desc: "Cet appareil n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé, mais la prudence est recommandée."
-  },
+  propre: { icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200", title: "✅ Appareil propre — Aucun signalement", desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif." },
+  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 ATTENTION — Appareil signalé VOLÉ", desc: "Cet appareil a été signalé volé. N'achetez PAS cet appareil." },
+  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Appareil signalé PERDU", desc: "Cet appareil a été déclaré perdu par son propriétaire." },
+  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 Appareil en cours d'enquête", desc: "Cet appareil fait l'objet d'une enquête." },
+  non_enregistre: { icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200", title: "⚪ Appareil non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace." },
 };
 
 const ScanResult = () => {
@@ -51,25 +32,38 @@ const ScanResult = () => {
   const [data, setData] = useState<ScanData | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (token?.startsWith("ST-CI-")) {
-        const hash = token.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-        const statuses: ScanStatus[] = ["propre", "vole", "perdu", "enquete"];
-        const status = statuses[hash % statuses.length];
+    const fetchDevice = async () => {
+      if (!token) { setData({ status: "non_enregistre" }); setLoading(false); return; }
+
+      const { data: device } = await supabase.from("devices").select("*").eq("token", token).maybeSingle();
+
+      if (device) {
         setData({
-          status,
-          nom: "Appareil enregistré",
-          categorie: "Téléphone",
-          marque: "Samsung",
-          dateEnregistrement: "2026-01-15",
-          region: "Haut-Sassandra",
+          status: device.statut as ScanStatus,
+          marque: device.marque,
+          modele: device.modele || undefined,
+          categorie: device.categorie,
+          region: device.region || undefined,
+          dateEnregistrement: device.created_at,
         });
+
+        // Notify owner
+        const { data: session } = await supabase.auth.getSession();
+        if (session?.session?.user?.id !== device.user_id) {
+          await supabase.from("notifications").insert({
+            user_id: device.user_id,
+            title: "Votre appareil a été scanné",
+            message: `Votre ${device.marque} ${device.modele || ""} (${device.token}) vient d'être scanné.`,
+            link: `/scan/${device.token}`,
+          });
+        }
       } else {
         setData({ status: "non_enregistre" });
       }
       setLoading(false);
-    }, 1500);
-    return () => clearTimeout(timer);
+    };
+
+    fetchDevice();
   }, [token]);
 
   const config = data ? statusConfig[data.status] : null;
@@ -105,22 +99,9 @@ const ScanResult = () => {
                     <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mb-6 border">
                       {data.categorie && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Catégorie</span><span className="font-medium">{data.categorie}</span></div>}
                       {data.marque && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Marque</span><span className="font-medium">{data.marque}</span></div>}
-                      {data.region && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />Région</span>
-                          <span className="font-medium">{data.region}</span>
-                        </div>
-                      )}
+                      {data.modele && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Modèle</span><span className="font-medium">{data.modele}</span></div>}
+                      {data.region && <div className="flex justify-between text-sm"><span className="text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />Région</span><span className="font-medium">{data.region}</span></div>}
                       {data.dateEnregistrement && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Enregistré le</span><span className="font-medium">{new Date(data.dateEnregistrement).toLocaleDateString("fr-FR")}</span></div>}
-                    </div>
-                  )}
-
-                  {(data.status === "vole" || data.status === "perdu") && (
-                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                      <Button className="bg-safe-green hover:bg-safe-green/90 text-white">
-                        <Phone className="h-4 w-4 mr-2" /> Contacter le propriétaire
-                      </Button>
-                      <Button variant="outline">Signaler aux autorités</Button>
                     </div>
                   )}
                 </CardContent>
@@ -129,12 +110,8 @@ const ScanResult = () => {
           ) : null}
 
           <div className="flex gap-3 mt-8 justify-center">
-            <Button variant="outline" asChild>
-              <Link to="/scanner"><ArrowLeft className="h-4 w-4 mr-2" /> Nouveau scan</Link>
-            </Button>
-            <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
-              <Link to="/inscription">S'inscrire gratuitement</Link>
-            </Button>
+            <Button variant="outline" asChild><Link to="/scanner"><ArrowLeft className="h-4 w-4 mr-2" /> Nouveau scan</Link></Button>
+            <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white"><Link to="/inscription">S'inscrire</Link></Button>
           </div>
         </div>
       </section>
