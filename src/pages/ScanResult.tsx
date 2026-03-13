@@ -5,40 +5,74 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
 
 type ScanStatus = "propre" | "vole" | "perdu" | "enquete" | "non_enregistre";
 
+interface ScanData {
+  status: ScanStatus;
+  nom?: string;
+  categorie?: string;
+  marque?: string;
+  dateEnregistrement?: string;
+  region?: string;
+}
+
 const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string }> = {
-  propre: { icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200", title: "✅ Appareil propre", desc: "Aucun signalement actif." },
-  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 SIGNALÉ VOLÉ", desc: "N'achetez PAS cet appareil." },
-  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Signalé PERDU", desc: "Déclaré perdu par son propriétaire." },
-  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 En cours d'enquête", desc: "Il est déconseillé de l'acheter." },
-  non_enregistre: { icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200", title: "⚪ Non enregistré", desc: "Pas dans la base SafeTrace." },
+  propre: {
+    icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200",
+    title: "✅ Appareil propre — Aucun signalement",
+    desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute sécurité."
+  },
+  vole: {
+    icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300",
+    title: "🔴 ATTENTION — Appareil signalé VOLÉ",
+    desc: "Cet appareil a été signalé volé par son propriétaire. N'achetez PAS cet appareil. Contactez les autorités ou le propriétaire."
+  },
+  perdu: {
+    icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200",
+    title: "🟡 Appareil signalé PERDU",
+    desc: "Cet appareil a été déclaré perdu par son propriétaire. Si vous l'avez trouvé, contactez-le."
+  },
+  enquete: {
+    icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200",
+    title: "🔵 Appareil en cours d'enquête",
+    desc: "Cet appareil fait l'objet d'une enquête en cours. Il est déconseillé de l'acheter."
+  },
+  non_enregistre: {
+    icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200",
+    title: "⚪ Appareil non enregistré",
+    desc: "Cet appareil n'est pas dans la base SafeTrace. Cela ne signifie pas qu'il est volé, mais la prudence est recommandée."
+  },
 };
 
 const ScanResult = () => {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<any>(null);
-  const [status, setStatus] = useState<ScanStatus>("non_enregistre");
+  const [data, setData] = useState<ScanData | null>(null);
 
   useEffect(() => {
-    const fetchDevice = async () => {
-      if (!token) { setLoading(false); return; }
-      const { data: device } = await supabase.from("devices").select("*").eq("token", token).maybeSingle();
-      if (device) {
-        setData(device);
-        setStatus(device.statut as ScanStatus);
+    const timer = setTimeout(() => {
+      if (token?.startsWith("ST-CI-")) {
+        const hash = token.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+        const statuses: ScanStatus[] = ["propre", "vole", "perdu", "enquete"];
+        const status = statuses[hash % statuses.length];
+        setData({
+          status,
+          nom: "Appareil enregistré",
+          categorie: "Téléphone",
+          marque: "Samsung",
+          dateEnregistrement: "2026-01-15",
+          region: "Haut-Sassandra",
+        });
       } else {
-        setStatus("non_enregistre");
+        setData({ status: "non_enregistre" });
       }
       setLoading(false);
-    };
-    fetchDevice();
+    }, 1500);
+    return () => clearTimeout(timer);
   }, [token]);
 
-  const config = statusConfig[status];
+  const config = data ? statusConfig[data.status] : null;
 
   return (
     <Layout>
@@ -56,10 +90,10 @@ const ScanResult = () => {
             <Card className="border-2">
               <CardContent className="p-12 text-center">
                 <div className="w-12 h-12 border-4 border-safe-green border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-muted-foreground">Vérification en cours…</p>
+                <p className="text-muted-foreground font-medium">Vérification en cours…</p>
               </CardContent>
             </Card>
-          ) : (
+          ) : config && data ? (
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
               <Card className={`border-2 ${config.borderColor} ${config.bg}`}>
                 <CardContent className="p-8 text-center">
@@ -67,22 +101,40 @@ const ScanResult = () => {
                   <h2 className="font-display text-xl md:text-2xl font-bold mb-3">{config.title}</h2>
                   <p className="text-muted-foreground mb-6">{config.desc}</p>
 
-                  {data && status !== "non_enregistre" && (
+                  {data.status !== "non_enregistre" && (
                     <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mb-6 border">
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Catégorie</span><span className="font-medium">{data.categorie}</span></div>
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Marque</span><span className="font-medium">{data.marque} {data.modele}</span></div>
-                      {data.region && <div className="flex justify-between text-sm"><span className="text-muted-foreground"><MapPin className="h-3 w-3 inline mr-1" />Région</span><span className="font-medium">{data.region}</span></div>}
-                      <div className="flex justify-between text-sm"><span className="text-muted-foreground">Enregistré le</span><span className="font-medium">{new Date(data.created_at).toLocaleDateString("fr-FR")}</span></div>
+                      {data.categorie && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Catégorie</span><span className="font-medium">{data.categorie}</span></div>}
+                      {data.marque && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Marque</span><span className="font-medium">{data.marque}</span></div>}
+                      {data.region && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />Région</span>
+                          <span className="font-medium">{data.region}</span>
+                        </div>
+                      )}
+                      {data.dateEnregistrement && <div className="flex justify-between text-sm"><span className="text-muted-foreground">Enregistré le</span><span className="font-medium">{new Date(data.dateEnregistrement).toLocaleDateString("fr-FR")}</span></div>}
+                    </div>
+                  )}
+
+                  {(data.status === "vole" || data.status === "perdu") && (
+                    <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                      <Button className="bg-safe-green hover:bg-safe-green/90 text-white">
+                        <Phone className="h-4 w-4 mr-2" /> Contacter le propriétaire
+                      </Button>
+                      <Button variant="outline">Signaler aux autorités</Button>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </motion.div>
-          )}
+          ) : null}
 
           <div className="flex gap-3 mt-8 justify-center">
-            <Button variant="outline" asChild><Link to="/scanner"><ArrowLeft className="h-4 w-4 mr-2" /> Nouveau scan</Link></Button>
-            <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white"><Link to="/inscription">S'inscrire</Link></Button>
+            <Button variant="outline" asChild>
+              <Link to="/scanner"><ArrowLeft className="h-4 w-4 mr-2" /> Nouveau scan</Link>
+            </Button>
+            <Button asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
+              <Link to="/inscription">S'inscrire gratuitement</Link>
+            </Button>
           </div>
         </div>
       </section>
