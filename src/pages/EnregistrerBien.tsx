@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { getBrandsForCategory, colors } from "@/data/brands";
 
 const categories = [
   { value: "telephone", label: "Téléphone / Tablette", icon: Smartphone, tarif: "200 F CFA", amount: 200 },
@@ -55,6 +56,9 @@ const EnregistrerBien = () => {
   const [loading, setLoading] = useState(false);
 
   const selectedCat = categories.find(c => c.value === categorie);
+  const brandsData = getBrandsForCategory(categorie);
+  const brandNames = Object.keys(brandsData);
+  const modelNames = marque && brandsData[marque] ? brandsData[marque] : [];
 
   const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).slice(0, 5);
@@ -74,7 +78,6 @@ const EnregistrerBien = () => {
     setLoading(true);
     const token = generateToken();
 
-    // Upload photos
     const photoUrls: string[] = [];
     for (const photo of photos) {
       const filePath = `${user.id}/${token}/${photo.name}`;
@@ -85,7 +88,6 @@ const EnregistrerBien = () => {
       }
     }
 
-    // Insert device
     const { error } = await supabase.from("devices").insert({
       user_id: user.id,
       categorie: categorie as any,
@@ -111,11 +113,7 @@ const EnregistrerBien = () => {
 
     setLoading(false);
 
-    if (error) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
-      return;
-    }
-
+    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
     setGeneratedToken(token);
     setSubmitted(true);
     toast({ title: "✅ Enregistrement réussi !", description: `Code SafeTrace : ${token}` });
@@ -137,12 +135,8 @@ const EnregistrerBien = () => {
               </div>
               <QRCodeGenerator token={generatedToken} bienNom={`${marque} ${modele}`} />
               <div className="flex gap-2 mt-6">
-                <Button asChild variant="outline" className="flex-1">
-                  <Link to="/tableau-de-bord">Tableau de bord</Link>
-                </Button>
-                <Button onClick={() => { setSubmitted(false); setGeneratedToken(""); setCategorie(""); setMarque(""); setModele(""); }} className="flex-1 bg-safe-green hover:bg-safe-green/90 text-white">
-                  Nouvel enregistrement
-                </Button>
+                <Button asChild variant="outline" className="flex-1"><Link to="/tableau-de-bord">Tableau de bord</Link></Button>
+                <Button onClick={() => { setSubmitted(false); setGeneratedToken(""); setCategorie(""); setMarque(""); setModele(""); }} className="flex-1 bg-safe-green hover:bg-safe-green/90 text-white">Nouveau</Button>
               </div>
             </motion.div>
           </div>
@@ -156,7 +150,7 @@ const EnregistrerBien = () => {
       <section className="py-8 md:py-16 bg-gradient-to-b from-safe-bg-blue to-background min-h-[80vh]">
         <div className="container mx-auto px-4 max-w-2xl">
           <Button variant="ghost" asChild className="mb-4">
-            <Link to="/tableau-de-bord"><ArrowLeft className="h-4 w-4 mr-2" /> Retour au tableau de bord</Link>
+            <Link to="/tableau-de-bord"><ArrowLeft className="h-4 w-4 mr-2" /> Retour</Link>
           </Button>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -171,7 +165,7 @@ const EnregistrerBien = () => {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-1.5">
                     <Label>Catégorie *</Label>
-                    <Select value={categorie} onValueChange={setCategorie}>
+                    <Select value={categorie} onValueChange={(v) => { setCategorie(v); setMarque(""); setModele(""); }}>
                       <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
@@ -183,18 +177,39 @@ const EnregistrerBien = () => {
 
                   {selectedCat && (
                     <div className="bg-safe-bg-green rounded-xl p-3 text-center">
-                      <p className="text-sm text-muted-foreground">Tarif d'enregistrement : <span className="font-display font-bold text-safe-green">{selectedCat.tarif}</span></p>
+                      <p className="text-sm text-muted-foreground">Tarif : <span className="font-display font-bold text-safe-green">{selectedCat.tarif}</span></p>
                     </div>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label>Marque *</Label>
-                      <Input value={marque} onChange={(e) => setMarque(e.target.value)} placeholder="Ex: Samsung, Honda…" />
+                      {brandNames.length > 0 ? (
+                        <Select value={marque} onValueChange={(v) => { setMarque(v); setModele(""); }}>
+                          <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                          <SelectContent>
+                            {brandNames.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                            <SelectItem value="__autre">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={marque} onChange={(e) => setMarque(e.target.value)} placeholder="Marque" />
+                      )}
+                      {marque === "__autre" && <Input value="" onChange={(e) => setMarque(e.target.value)} placeholder="Saisir la marque" className="mt-1" />}
                     </div>
                     <div className="space-y-1.5">
                       <Label>Modèle</Label>
-                      <Input value={modele} onChange={(e) => setModele(e.target.value)} placeholder="Ex: Galaxy S24, CBR…" />
+                      {modelNames.length > 0 ? (
+                        <Select value={modele} onValueChange={setModele}>
+                          <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                          <SelectContent>
+                            {modelNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                            <SelectItem value="__autre_modele">Autre</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={modele} onChange={(e) => setModele(e.target.value)} placeholder="Modèle" />
+                      )}
                     </div>
                   </div>
 
@@ -232,7 +247,15 @@ const EnregistrerBien = () => {
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5"><Label>Couleur</Label><Input value={couleur} onChange={(e) => setCouleur(e.target.value)} /></div>
+                    <div className="space-y-1.5">
+                      <Label>Couleur</Label>
+                      <Select value={couleur} onValueChange={setCouleur}>
+                        <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
+                        <SelectContent>
+                          {colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="space-y-1.5"><Label>Année d'achat</Label><Input type="number" value={annee} onChange={(e) => setAnnee(e.target.value)} placeholder="2024" /></div>
                   </div>
 
@@ -245,10 +268,10 @@ const EnregistrerBien = () => {
 
                   <div className="space-y-1.5">
                     <Label>Photos (1 à 5)</Label>
-                    <label className="border-2 border-dashed rounded-xl p-8 text-center text-muted-foreground cursor-pointer hover:border-safe-green/50 transition-colors block">
+                    <label className="border-2 border-dashed rounded-xl p-6 text-center text-muted-foreground cursor-pointer hover:border-safe-green/50 transition-colors block">
                       <Camera className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">Cliquez ou glissez vos photos ici</p>
-                      {photos.length > 0 && <p className="text-xs text-safe-green mt-2 font-medium">{photos.length} photo(s)</p>}
+                      <p className="text-sm">Cliquez pour ajouter des photos</p>
+                      {photos.length > 0 && <p className="text-xs text-safe-green mt-1 font-medium">{photos.length} photo(s)</p>}
                       <input type="file" accept="image/*" multiple onChange={handlePhotos} className="hidden" />
                     </label>
                   </div>
