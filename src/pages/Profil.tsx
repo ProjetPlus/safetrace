@@ -30,6 +30,24 @@ const Profil = () => {
       setNom(profile.nom || "");
       setPrenoms(profile.prenoms || "");
       setWhatsapp(profile.whatsapp || "");
+      // Fetch full profile to get all fields
+      const fetchFull = async () => {
+        const { data } = await supabase.from("profiles").select("*").eq("id", profile.id).single();
+        if (data) {
+          setEmailSecours(data.email_secours || "");
+          setTelSecours(data.tel_secours || "");
+          setContactUrgenceNom(data.contact_urgence_nom || "");
+          setContactUrgenceTel(data.contact_urgence_tel || "");
+          setLocation({
+            village: data.village || "",
+            sousPrefecture: data.sous_prefecture || "",
+            departement: data.departement || "",
+            region: data.region || "",
+            district: data.district || "",
+          });
+        }
+      };
+      fetchFull();
     }
   }, [profile]);
 
@@ -64,7 +82,7 @@ const Profil = () => {
     }
 
     await refreshProfile();
-    toast({ title: "✅ Profil mis à jour" });
+    toast({ title: "✅ Profil mis à jour avec succès" });
   };
 
   return (

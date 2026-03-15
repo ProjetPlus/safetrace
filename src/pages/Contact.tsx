@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Contact = () => {
   const { toast } = useToast();
@@ -16,18 +17,21 @@ const Contact = () => {
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!nom || !contact || !message) {
       toast({ title: "Erreur", description: "Veuillez remplir tous les champs.", variant: "destructive" });
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      toast({ title: "✅ Message envoyé", description: "Nous vous répondrons dans les plus brefs délais." });
-      setNom(""); setContact(""); setMessage("");
-    }, 1000);
+    const { error } = await supabase.from("contact_messages").insert({ nom, contact, message });
+    setLoading(false);
+    if (error) {
+      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "✅ Message envoyé", description: "Nous vous répondrons dans les plus brefs délais." });
+    setNom(""); setContact(""); setMessage("");
   };
 
   return (
@@ -68,8 +72,8 @@ const Contact = () => {
 
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="space-y-4">
               {[
-                { icon: Phone, label: "Téléphone / WhatsApp", value: "+225 07 59 56 60 87" },
-                { icon: Mail, label: "Email", value: "contact@safetrace.ci" },
+                { icon: Phone, label: "Téléphone / WhatsApp", value: "+225 07 07 16 79 21", href: "https://wa.me/2250707167921" },
+                { icon: Mail, label: "Email", value: "contact@safetrace.ci", href: "mailto:contact@safetrace.ci" },
                 { icon: MapPin, label: "Adresse", value: "Daloa, Haut-Sassandra, Côte d'Ivoire" },
               ].map((item) => (
                 <Card key={item.label}>
@@ -79,7 +83,11 @@ const Contact = () => {
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">{item.label}</div>
-                      <div className="font-medium">{item.value}</div>
+                      {item.href ? (
+                        <a href={item.href} target="_blank" rel="noopener noreferrer" className="font-medium hover:text-primary">{item.value}</a>
+                      ) : (
+                        <div className="font-medium">{item.value}</div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Monitor, WashingMachine } from "lucide-react";
+import { Package, Plus, Search, Filter, QrCode, AlertTriangle, ArrowRightLeft, Smartphone, Car, Laptop, Monitor, WashingMachine, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -93,10 +93,10 @@ const MesBiens = () => {
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher par nom, marque, identifiant…" className="pl-10" />
+                  <Input value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Rechercher..." className="pl-10" />
                 </div>
                 <Select value={filterCategorie} onValueChange={setFilterCategorie}>
-                  <SelectTrigger className="w-full md:w-48"><Filter className="h-4 w-4 mr-2" /><SelectValue placeholder="Catégorie" /></SelectTrigger>
+                  <SelectTrigger className="w-full md:w-40"><Filter className="h-4 w-4 mr-2" /><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tous">Toutes</SelectItem>
                     <SelectItem value="telephone">Téléphones</SelectItem>
@@ -108,7 +108,7 @@ const MesBiens = () => {
                   </SelectContent>
                 </Select>
                 <Select value={filterStatut} onValueChange={setFilterStatut}>
-                  <SelectTrigger className="w-full md:w-48"><SelectValue placeholder="Statut" /></SelectTrigger>
+                  <SelectTrigger className="w-full md:w-40"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tous">Tous</SelectItem>
                     <SelectItem value="propre">Propre</SelectItem>
@@ -129,7 +129,6 @@ const MesBiens = () => {
               <CardContent className="py-16 text-center text-muted-foreground">
                 <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p className="font-medium">Aucun appareil trouvé</p>
-                <p className="text-sm">Modifiez vos filtres ou enregistrez un nouvel appareil.</p>
               </CardContent>
             </Card>
           ) : (
@@ -140,35 +139,23 @@ const MesBiens = () => {
                 const name = `${item.marque}${item.modele ? ` ${item.modele}` : ""}`;
                 const identifier = item.imei1 || item.num_serie || item.chassis || item.token;
                 return (
-                  <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                  <motion.div key={item.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
                     <Card className="hover:shadow-md transition-shadow">
                       <CardContent className="p-4">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <div className="flex items-center justify-between gap-3">
+                          <Link to={`/appareil/${item.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                               <CatIcon className="h-5 w-5 text-primary" />
                             </div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">{name}</div>
-                              <div className="text-sm text-muted-foreground truncate">{identifier}</div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                {categoryLabels[item.categorie]} · {new Date(item.created_at).toLocaleDateString("fr-FR")}
-                              </div>
+                              <div className="font-display font-semibold truncate text-sm">{name}</div>
+                              <div className="text-xs text-muted-foreground truncate">{identifier}</div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statut.bg} ${statut.text} hidden sm:inline-block`}>{statut.label}</span>
-                            <Button variant="ghost" size="icon" onClick={() => setQrDialog({ open: true, token: item.token, nom: name })} title="QR Code">
-                              <QrCode className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => setTransferDialog({ open: true, bienNom: name })} title="Transférer">
-                              <ArrowRightLeft className="h-4 w-4" />
-                            </Button>
-                            {item.statut === "propre" && (
-                              <Button variant="ghost" size="icon" asChild title="Signaler">
-                                <Link to="/signaler"><AlertTriangle className="h-4 w-4 text-destructive" /></Link>
-                              </Button>
-                            )}
+                          </Link>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statut.bg} ${statut.text} hidden sm:inline-block`}>{statut.label}</span>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setQrDialog({ open: true, token: item.token, nom: name })}><QrCode className="h-3.5 w-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setTransferDialog({ open: true, bienNom: name })}><ArrowRightLeft className="h-3.5 w-3.5" /></Button>
                           </div>
                         </div>
                       </CardContent>

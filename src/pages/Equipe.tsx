@@ -52,7 +52,7 @@ const Equipe = () => (
                 <img
                   src={founder.photo}
                   alt={founder.name}
-                  className="relative w-56 h-56 object-cover rounded-2xl z-10"
+                  className="relative w-64 h-72 object-cover object-top rounded-2xl z-10"
                 />
               </div>
               <h3 className="font-display text-xl font-bold mb-1">{founder.name}</h3>

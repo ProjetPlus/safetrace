@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ScrollToTop from "@/components/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import AdminRoute from "@/components/AdminRoute";
 import Index from "./pages/Index";
 import Scanner from "./pages/Scanner";
 import Inscription from "./pages/Inscription";
@@ -23,7 +24,14 @@ import Confirmation from "./pages/Confirmation";
 import MotDePasseOublie from "./pages/MotDePasseOublie";
 import ResetPassword from "./pages/ResetPassword";
 import Profil from "./pages/Profil";
+import DeviceDetail from "./pages/DeviceDetail";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminDevices from "./pages/admin/AdminDevices";
+import AdminReports from "./pages/admin/AdminReports";
+import AdminPayments from "./pages/admin/AdminPayments";
+import AdminContacts from "./pages/admin/AdminContacts";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +65,15 @@ const App = () => (
             <Route path="/enregistrer-bien" element={<ProtectedRoute><EnregistrerBien /></ProtectedRoute>} />
             <Route path="/signaler" element={<ProtectedRoute><Signaler /></ProtectedRoute>} />
             <Route path="/profil" element={<ProtectedRoute><Profil /></ProtectedRoute>} />
+            <Route path="/appareil/:id" element={<ProtectedRoute><DeviceDetail /></ProtectedRoute>} />
+
+            {/* Admin routes */}
+            <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/utilisateurs" element={<AdminRoute><AdminUsers /></AdminRoute>} />
+            <Route path="/admin/appareils" element={<AdminRoute><AdminDevices /></AdminRoute>} />
+            <Route path="/admin/signalements" element={<AdminRoute><AdminReports /></AdminRoute>} />
+            <Route path="/admin/paiements" element={<AdminRoute><AdminPayments /></AdminRoute>} />
+            <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
