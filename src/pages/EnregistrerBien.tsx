@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Package, Smartphone, Car, Laptop, Camera, ArrowLeft, Monitor, WashingMachine } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Package, Smartphone, Car, Laptop, Camera, ArrowLeft, Monitor, WashingMachine, CreditCard, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { getBrandsForCategory, colors } from "@/data/brands";
+import { getBrandsForCategory, colors, getYears } from "@/data/brands";
 
 const categories = [
   { value: "telephone", label: "Téléphone / Tablette", icon: Smartphone, tarif: "200 F CFA", amount: 200 },
@@ -24,6 +24,8 @@ const categories = [
   { value: "voiture", label: "Voiture / Véhicule automobile", icon: Car, tarif: "2 000 F CFA", amount: 2000 },
   { value: "moto", label: "Moto / Tricycle", icon: Car, tarif: "1 000 F CFA", amount: 1000 },
 ];
+
+const STORAGE_KEY = "safetrace_registration_draft";
 
 const generateToken = () => {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -37,9 +39,13 @@ const EnregistrerBien = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
   const [categorie, setCategorie] = useState("");
   const [marque, setMarque] = useState("");
+  const [customMarque, setCustomMarque] = useState("");
   const [modele, setModele] = useState("");
+  const [customModele, setCustomModele] = useState("");
   const [couleur, setCouleur] = useState("");
   const [annee, setAnnee] = useState("");
   const [description, setDescription] = useState("");
@@ -54,11 +60,113 @@ const EnregistrerBien = () => {
   const [generatedToken, setGeneratedToken] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
+  const [checkingPayment, setCheckingPayment] = useState(false);
 
   const selectedCat = categories.find(c => c.value === categorie);
   const brandsData = getBrandsForCategory(categorie);
   const brandNames = Object.keys(brandsData);
-  const modelNames = marque && brandsData[marque] ? brandsData[marque] : [];
+  const effectiveMarque = marque === "__autre" ? customMarque : marque;
+  const modelNames = marque && marque !== "__autre" && brandsData[marque] ? brandsData[marque] : [];
+  const effectiveModele = modele === "__autre_modele" ? customModele : modele;
+  const years = getYears();
+
+  // Auto-save to localStorage
+  useEffect(() => {
+    const draft = { categorie, marque, customMarque, modele, customModele, couleur, annee, description, imei1, imei2, numSerie, operateur, chassis, plaque, location };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+  }, [categorie, marque, customMarque, modele, customModele, couleur, annee, description, imei1, imei2, numSerie, operateur, chassis, plaque, location]);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.categorie) setCategorie(draft.categorie);
+        if (draft.marque) setMarque(draft.marque);
+        if (draft.customMarque) setCustomMarque(draft.customMarque);
+        if (draft.modele) setModele(draft.modele);
+        if (draft.customModele) setCustomModele(draft.customModele);
+        if (draft.couleur) setCouleur(draft.couleur);
+        if (draft.annee) setAnnee(draft.annee);
+        if (draft.description) setDescription(draft.description);
+        if (draft.imei1) setImei1(draft.imei1);
+        if (draft.imei2) setImei2(draft.imei2);
+        if (draft.numSerie) setNumSerie(draft.numSerie);
+        if (draft.operateur) setOperateur(draft.operateur);
+        if (draft.chassis) setChassis(draft.chassis);
+        if (draft.plaque) setPlaque(draft.plaque);
+        if (draft.location) setLocation(draft.location);
+      }
+    } catch {}
+  }, []);
+
+  // Check payment status from URL params
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    const paymentId = searchParams.get("payment_id");
+
+    if (paymentStatus === "success" && paymentId) {
+      setCheckingPayment(true);
+      checkPaymentAndFinalize(paymentId);
+    } else if (paymentStatus === "error") {
+      toast({ title: "Paiement échoué", description: "Le paiement n'a pas abouti. Veuillez réessayer.", variant: "destructive" });
+    }
+  }, [searchParams]);
+
+  const checkPaymentAndFinalize = async (paymentId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("check-payment", {
+        body: { payment_id: paymentId },
+      });
+
+      if (error) throw error;
+
+      if (data.status === "completed") {
+        // Device was created by webhook, find token
+        if (data.payment?.device_id) {
+          const { data: device } = await supabase.from("devices").select("token, marque, modele").eq("id", data.payment.device_id).single();
+          if (device) {
+            setGeneratedToken(device.token);
+            setMarque(device.marque);
+            setModele(device.modele || "");
+            setSubmitted(true);
+            localStorage.removeItem(STORAGE_KEY);
+            toast({ title: "✅ Enregistrement confirmé !", description: `Code SafeTrace : ${device.token}` });
+          }
+        } else if (data.payment?.payment_reference) {
+          // Webhook hasn't fired yet, create device manually
+          const deviceData = JSON.parse(data.payment.payment_reference);
+          
+          // Check if device already exists
+          const { data: existing } = await supabase.from("devices").select("id").eq("token", deviceData.token).maybeSingle();
+          if (!existing) {
+            const { error: insertError } = await supabase.from("devices").insert({
+              ...deviceData,
+              user_id: user!.id,
+            });
+            if (insertError) {
+              toast({ title: "Erreur", description: insertError.message, variant: "destructive" });
+              setCheckingPayment(false);
+              return;
+            }
+            await supabase.from("payments").update({ device_id: null }).eq("id", paymentId);
+          }
+
+          setGeneratedToken(deviceData.token);
+          setSubmitted(true);
+          localStorage.removeItem(STORAGE_KEY);
+          toast({ title: "✅ Enregistrement confirmé !", description: `Code SafeTrace : ${deviceData.token}` });
+        }
+      } else {
+        toast({ title: "Paiement en attente", description: "Votre paiement est en cours de traitement. Veuillez patienter.", variant: "default" });
+      }
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
+    setCheckingPayment(false);
+  };
 
   const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []).slice(0, 5);
@@ -70,7 +178,7 @@ const EnregistrerBien = () => {
     e.preventDefault();
     if (!user) { toast({ title: "Erreur", description: "Vous devez être connecté.", variant: "destructive" }); return; }
     if (!categorie) { toast({ title: "Erreur", description: "Veuillez choisir une catégorie.", variant: "destructive" }); return; }
-    if (!marque) { toast({ title: "Erreur", description: "Veuillez saisir la marque.", variant: "destructive" }); return; }
+    if (!effectiveMarque) { toast({ title: "Erreur", description: "Veuillez saisir la marque.", variant: "destructive" }); return; }
     if (categorie === "telephone" && !imei1) { toast({ title: "Erreur", description: "L'IMEI 1 est obligatoire.", variant: "destructive" }); return; }
     if ((categorie === "voiture" || categorie === "moto") && !chassis) { toast({ title: "Erreur", description: "Le numéro de châssis est obligatoire.", variant: "destructive" }); return; }
     if (["ordinateur", "televiseur", "electromenager"].includes(categorie) && !numSerie) { toast({ title: "Erreur", description: "Le numéro de série est obligatoire.", variant: "destructive" }); return; }
@@ -78,6 +186,7 @@ const EnregistrerBien = () => {
     setLoading(true);
     const token = generateToken();
 
+    // Upload photos first
     const photoUrls: string[] = [];
     for (const photo of photos) {
       const filePath = `${user.id}/${token}/${photo.name}`;
@@ -88,11 +197,11 @@ const EnregistrerBien = () => {
       }
     }
 
-    const { error } = await supabase.from("devices").insert({
-      user_id: user.id,
+    // Prepare device data
+    const deviceData = {
       categorie: categorie as any,
-      marque,
-      modele: modele || null,
+      marque: effectiveMarque,
+      modele: effectiveModele || null,
       couleur: couleur || null,
       annee_achat: annee ? parseInt(annee) : null,
       description: description || null,
@@ -109,15 +218,45 @@ const EnregistrerBien = () => {
       departement: location.departement || null,
       region: location.region || null,
       district: location.district || null,
-    });
+    };
 
-    setLoading(false);
+    // Initiate Wave payment
+    try {
+      const { data, error } = await supabase.functions.invoke("wave-checkout", {
+        body: {
+          amount: selectedCat!.amount,
+          device_data: deviceData,
+          description: `Enregistrement ${selectedCat!.label}: ${effectiveMarque} ${effectiveModele || ""}`,
+        },
+      });
 
-    if (error) { toast({ title: "Erreur", description: error.message, variant: "destructive" }); return; }
-    setGeneratedToken(token);
-    setSubmitted(true);
-    toast({ title: "✅ Enregistrement réussi !", description: `Code SafeTrace : ${token}` });
+      if (error) throw error;
+
+      if (data?.wave_launch_url) {
+        // Redirect to Wave payment page
+        window.location.href = data.wave_launch_url;
+      } else {
+        throw new Error("Impossible de créer la session de paiement");
+      }
+    } catch (err: any) {
+      toast({ title: "Erreur de paiement", description: err.message || "Impossible d'initier le paiement. Veuillez réessayer.", variant: "destructive" });
+      setLoading(false);
+    }
   };
+
+  if (checkingPayment) {
+    return (
+      <Layout>
+        <section className="py-16 md:py-24 bg-gradient-to-b from-safe-bg-green to-background min-h-[80vh]">
+          <div className="container mx-auto px-4 max-w-md text-center">
+            <Loader2 className="h-16 w-16 animate-spin text-safe-green mx-auto mb-6" />
+            <h2 className="font-display text-2xl font-bold mb-2">Vérification du paiement…</h2>
+            <p className="text-muted-foreground">Veuillez patienter pendant que nous confirmons votre paiement.</p>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
 
   if (submitted && generatedToken) {
     return (
@@ -127,16 +266,16 @@ const EnregistrerBien = () => {
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
               <div className="text-center mb-6">
                 <div className="w-16 h-16 rounded-full bg-safe-green/10 flex items-center justify-center mx-auto mb-4">
-                  <Package className="h-8 w-8 text-safe-green" />
+                  <CheckCircle2 className="h-8 w-8 text-safe-green" />
                 </div>
                 <h2 className="font-display text-2xl font-bold text-foreground">Enregistrement réussi !</h2>
-                <p className="text-muted-foreground mt-1">{marque} {modele}</p>
-                {selectedCat && <p className="text-sm text-safe-green font-medium mt-1">Tarif : {selectedCat.tarif}</p>}
+                <p className="text-muted-foreground mt-1">{effectiveMarque} {effectiveModele}</p>
+                <p className="text-sm text-safe-green font-medium mt-1">Paiement confirmé ✅</p>
               </div>
-              <QRCodeGenerator token={generatedToken} bienNom={`${marque} ${modele}`} />
+              <QRCodeGenerator token={generatedToken} bienNom={`${effectiveMarque} ${effectiveModele}`} />
               <div className="flex gap-2 mt-6">
                 <Button asChild variant="outline" className="flex-1"><Link to="/tableau-de-bord">Tableau de bord</Link></Button>
-                <Button onClick={() => { setSubmitted(false); setGeneratedToken(""); setCategorie(""); setMarque(""); setModele(""); }} className="flex-1 bg-safe-green hover:bg-safe-green/90 text-white">Nouveau</Button>
+                <Button onClick={() => { setSubmitted(false); setGeneratedToken(""); setCategorie(""); setMarque(""); setModele(""); localStorage.removeItem(STORAGE_KEY); }} className="flex-1 bg-safe-green hover:bg-safe-green/90 text-white">Nouveau</Button>
               </div>
             </motion.div>
           </div>
@@ -160,12 +299,13 @@ const EnregistrerBien = () => {
                   <Package className="h-7 w-7 text-safe-green" />
                 </div>
                 <CardTitle className="font-display text-2xl">Enregistrer un appareil ou véhicule</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">Le paiement sera effectué via Wave avant l'enregistrement</p>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div className="space-y-1.5">
                     <Label>Catégorie *</Label>
-                    <Select value={categorie} onValueChange={(v) => { setCategorie(v); setMarque(""); setModele(""); }}>
+                    <Select value={categorie} onValueChange={(v) => { setCategorie(v); setMarque(""); setModele(""); setCustomMarque(""); setCustomModele(""); }}>
                       <SelectTrigger><SelectValue placeholder="Choisir une catégorie" /></SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
@@ -176,8 +316,12 @@ const EnregistrerBien = () => {
                   </div>
 
                   {selectedCat && (
-                    <div className="bg-safe-bg-green rounded-xl p-3 text-center">
-                      <p className="text-sm text-muted-foreground">Tarif : <span className="font-display font-bold text-safe-green">{selectedCat.tarif}</span></p>
+                    <div className="bg-safe-bg-green rounded-xl p-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="h-4 w-4 text-safe-green" />
+                        <span className="text-sm">Tarif d'enregistrement :</span>
+                      </div>
+                      <span className="font-display font-bold text-safe-green">{selectedCat.tarif}</span>
                     </div>
                   )}
 
@@ -185,31 +329,32 @@ const EnregistrerBien = () => {
                     <div className="space-y-1.5">
                       <Label>Marque *</Label>
                       {brandNames.length > 0 ? (
-                        <Select value={marque} onValueChange={(v) => { setMarque(v); setModele(""); }}>
+                        <Select value={marque} onValueChange={(v) => { setMarque(v); setModele(""); setCustomModele(""); }}>
                           <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-60">
                             {brandNames.map(b => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-                            <SelectItem value="__autre">Autre</SelectItem>
+                            <SelectItem value="__autre">Autre marque</SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Input value={marque} onChange={(e) => setMarque(e.target.value)} placeholder="Marque" />
+                        <Input value={customMarque} onChange={(e) => { setCustomMarque(e.target.value); setMarque("__autre"); }} placeholder="Marque" />
                       )}
-                      {marque === "__autre" && <Input value="" onChange={(e) => setMarque(e.target.value)} placeholder="Saisir la marque" className="mt-1" />}
+                      {marque === "__autre" && <Input value={customMarque} onChange={(e) => setCustomMarque(e.target.value)} placeholder="Saisir la marque" className="mt-1" />}
                     </div>
                     <div className="space-y-1.5">
                       <Label>Modèle</Label>
                       {modelNames.length > 0 ? (
                         <Select value={modele} onValueChange={setModele}>
                           <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="max-h-60">
                             {modelNames.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                            <SelectItem value="__autre_modele">Autre</SelectItem>
+                            <SelectItem value="__autre_modele">Autre modèle</SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (
-                        <Input value={modele} onChange={(e) => setModele(e.target.value)} placeholder="Modèle" />
+                        <Input value={customModele} onChange={(e) => { setCustomModele(e.target.value); setModele("__autre_modele"); }} placeholder="Modèle" />
                       )}
+                      {modele === "__autre_modele" && modelNames.length > 0 && <Input value={customModele} onChange={(e) => setCustomModele(e.target.value)} placeholder="Saisir le modèle" className="mt-1" />}
                     </div>
                   </div>
 
@@ -236,7 +381,7 @@ const EnregistrerBien = () => {
                   {(categorie === "voiture" || categorie === "moto") && (
                     <div className="space-y-3 p-4 bg-safe-bg-blue rounded-xl">
                       <div className="space-y-1.5"><Label>Châssis / VIN *</Label><Input value={chassis} onChange={(e) => setChassis(e.target.value)} placeholder="17 caractères" /></div>
-                      <div className="space-y-1.5"><Label>Plaque</Label><Input value={plaque} onChange={(e) => setPlaque(e.target.value)} /></div>
+                      <div className="space-y-1.5"><Label>Plaque d'immatriculation</Label><Input value={plaque} onChange={(e) => setPlaque(e.target.value)} /></div>
                     </div>
                   )}
 
@@ -251,12 +396,20 @@ const EnregistrerBien = () => {
                       <Label>Couleur</Label>
                       <Select value={couleur} onValueChange={setCouleur}>
                         <SelectTrigger><SelectValue placeholder="Choisir" /></SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="max-h-60">
                           {colors.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="space-y-1.5"><Label>Année d'achat</Label><Input type="number" value={annee} onChange={(e) => setAnnee(e.target.value)} placeholder="2024" /></div>
+                    <div className="space-y-1.5">
+                      <Label>Année d'achat</Label>
+                      <Select value={annee} onValueChange={setAnnee}>
+                        <SelectTrigger><SelectValue placeholder="Année" /></SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          {years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -276,9 +429,14 @@ const EnregistrerBien = () => {
                     </label>
                   </div>
 
+                  <div className="bg-muted/50 rounded-xl p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-1">En cliquant sur le bouton ci-dessous, vous serez redirigé vers Wave pour effectuer le paiement.</p>
+                    <p className="text-xs text-muted-foreground">L'enregistrement ne sera validé qu'après confirmation du paiement.</p>
+                  </div>
+
                   <Button type="submit" className="w-full bg-safe-green hover:bg-safe-green/90 text-white" size="lg" disabled={loading}>
-                    <Package className="h-4 w-4 mr-2" />
-                    {loading ? "Enregistrement…" : `Enregistrer${selectedCat ? ` — ${selectedCat.tarif}` : ""}`}
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    {loading ? "Redirection vers Wave…" : `Payer et enregistrer${selectedCat ? ` — ${selectedCat.tarif}` : ""}`}
                   </Button>
                 </form>
               </CardContent>
