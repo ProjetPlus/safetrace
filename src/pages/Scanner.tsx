@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { ScanLine, Search, Camera, Keyboard, Shield, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { ScanLine, Search, Camera, Keyboard, Shield, AlertTriangle, CheckCircle2, XCircle, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,15 +7,19 @@ import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Html5Qrcode } from "html5-qrcode";
 
-type ResultStatus = "propre" | "vole" | "perdu" | "enquete" | "non_enregistre" | null;
+const SAFETRACE_CONTACT = "+225 07 07 16 79 21";
+const SAFETRACE_WA = "2250707167921";
+
+type ResultStatus = "propre" | "vole" | "perdu" | "enquete" | "retrouve" | "non_enregistre" | null;
 
 interface ScanData {
   status: ResultStatus;
   marque?: string;
   modele?: string;
   categorie?: string;
-  region?: string;
+  couleur?: string;
   dateEnregistrement?: string;
 }
 
@@ -27,8 +31,8 @@ const Scanner = () => {
   const [result, setResult] = useState<ScanData | null>(null);
   const [searched, setSearched] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerDivId = "qr-reader";
 
   const detectType = (value: string): string => {
     if (/^\d{14,16}$/.test(value)) return "IMEI détecté";
@@ -38,37 +42,18 @@ const Scanner = () => {
     return "";
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) { toast({ title: "Erreur", description: "Veuillez saisir un identifiant.", variant: "destructive" }); return; }
-
+  const searchDevice = useCallback(async (q: string) => {
+    if (!q.trim()) return;
     setLoading(true);
     setSearched(true);
 
-    // Search in database
-    let device = null;
-    const q = query.trim();
+    let data = null;
+    const val = q.trim();
 
-    // Try token
-    let { data } = await supabase.from("devices").select("*").eq("token", q).maybeSingle();
-    if (!data) {
-      // Try IMEI
-      ({ data } = await supabase.from("devices").select("*").eq("imei1", q).maybeSingle());
-    }
-    if (!data) {
-      ({ data } = await supabase.from("devices").select("*").eq("imei2", q).maybeSingle());
-    }
-    if (!data) {
-      // Try chassis
-      ({ data } = await supabase.from("devices").select("*").eq("chassis", q).maybeSingle());
-    }
-    if (!data) {
-      // Try num_serie
-      ({ data } = await supabase.from("devices").select("*").eq("num_serie", q).maybeSingle());
-    }
-    if (!data) {
-      // Try plaque
-      ({ data } = await supabase.from("devices").select("*").eq("plaque", q).maybeSingle());
+    // Try all identifiers
+    for (const field of ["token", "imei1", "imei2", "chassis", "num_serie", "plaque"] as const) {
+      const res = await supabase.from("devices").select("*").eq(field, val).maybeSingle();
+      if (res.data) { data = res.data; break; }
     }
 
     setLoading(false);
@@ -79,61 +64,119 @@ const Scanner = () => {
         marque: data.marque,
         modele: data.modele || undefined,
         categorie: data.categorie,
-        region: data.region || undefined,
+        couleur: data.couleur || undefined,
         dateEnregistrement: data.created_at,
       });
 
-      // Create notification for device owner if scanned by someone else
+      // Notify owner
       const { data: session } = await supabase.auth.getSession();
       if (session?.session?.user?.id !== data.user_id) {
         await supabase.from("notifications").insert({
           user_id: data.user_id,
           title: "Votre appareil a été scanné",
-          message: `Votre ${data.marque} ${data.modele || ""} (${data.token}) vient d'être scanné par quelqu'un.`,
+          message: `Votre ${data.marque} ${data.modele || ""} (${data.token}) vient d'être scanné.`,
           link: `/scan/${data.token}`,
         });
       }
     } else {
       setResult({ status: "non_enregistre" });
     }
+  }, []);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) { toast({ title: "Erreur", description: "Veuillez saisir un identifiant.", variant: "destructive" }); return; }
+    await searchDevice(query);
   };
 
-  // Camera handling
-  const startCamera = async () => {
+  // QR Scanner with html5-qrcode
+  const startScanner = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
-      }
+      const scanner = new Html5Qrcode(scannerDivId);
+      scannerRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1,
+        },
+        (decodedText) => {
+          // QR code detected
+          setQuery(decodedText);
+          scanner.stop().then(() => {
+            setCameraActive(false);
+            setMode("manual");
+            searchDevice(decodedText);
+          });
+        },
+        () => { /* ignore errors during scanning */ }
+      );
       setCameraActive(true);
-    } catch {
-      toast({ title: "Erreur", description: "Impossible d'accéder à la caméra.", variant: "destructive" });
+    } catch (err) {
+      console.error("Camera error:", err);
+      toast({ title: "Erreur caméra", description: "Impossible d'accéder à la caméra. Vérifiez les permissions.", variant: "destructive" });
       setMode("manual");
     }
-  };
+  }, [searchDevice, toast]);
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+      } catch { /* already stopped */ }
+      scannerRef.current = null;
     }
     setCameraActive(false);
-  };
+  }, []);
 
   useEffect(() => {
-    if (mode === "camera") startCamera();
-    else stopCamera();
-    return () => stopCamera();
+    if (mode === "camera") {
+      // Small delay to let the div render
+      const timer = setTimeout(() => startScanner(), 300);
+      return () => { clearTimeout(timer); stopScanner(); };
+    } else {
+      stopScanner();
+    }
+    return () => { stopScanner(); };
   }, [mode]);
 
-  const resultDisplay: Record<string, { icon: any; bg: string; iconColor: string; title: string; desc: string }> = {
-    propre: { icon: CheckCircle2, bg: "bg-green-50 border-green-200", iconColor: "text-green-600", title: "✅ Appareil propre", desc: "Cet appareil est enregistré et aucun signalement n'est actif." },
-    vole: { icon: AlertTriangle, bg: "bg-red-50 border-red-200", iconColor: "text-red-600", title: "🔴 Signalé VOLÉ", desc: "ATTENTION — Cet appareil a été signalé volé. Ne l'achetez pas." },
-    perdu: { icon: AlertTriangle, bg: "bg-yellow-50 border-yellow-200", iconColor: "text-yellow-600", title: "🟡 Signalé PERDU", desc: "Cet appareil a été déclaré perdu par son propriétaire." },
-    enquete: { icon: Shield, bg: "bg-blue-50 border-blue-200", iconColor: "text-blue-600", title: "🔵 En enquête", desc: "Cet appareil fait l'objet d'une enquête." },
-    non_enregistre: { icon: XCircle, bg: "bg-gray-50 border-gray-200", iconColor: "text-gray-500", title: "⚪ Non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace." },
+  const statusMessages: Record<string, { icon: any; bg: string; iconColor: string; title: string; desc: string; action?: string }> = {
+    propre: {
+      icon: CheckCircle2, bg: "bg-green-50 border-green-200", iconColor: "text-green-600",
+      title: "✅ Appareil propre — Aucun signalement",
+      desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez acheter cet appareil en toute sécurité.",
+    },
+    vole: {
+      icon: AlertTriangle, bg: "bg-red-50 border-red-300", iconColor: "text-red-600",
+      title: "🔴 ATTENTION — Appareil signalé VOLÉ",
+      desc: "Cet appareil a été signalé VOLÉ sur SafeTrace.",
+      action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez SAISIR la personne en possession de cet actif et appeler immédiatement SafeTrace.",
+    },
+    perdu: {
+      icon: AlertTriangle, bg: "bg-yellow-50 border-yellow-200", iconColor: "text-yellow-600",
+      title: "🟡 Appareil signalé PERDU",
+      desc: "Cet appareil a été déclaré PERDU par son propriétaire.",
+      action: "Veuillez contacter SafeTrace pour aider à restituer cet appareil à son propriétaire.",
+    },
+    enquete: {
+      icon: Shield, bg: "bg-blue-50 border-blue-200", iconColor: "text-blue-600",
+      title: "🔵 Appareil en cours d'enquête",
+      desc: "Cet appareil fait l'objet d'une enquête en cours.",
+      action: "Contactez SafeTrace pour plus d'informations sur cet appareil.",
+    },
+    retrouve: {
+      icon: CheckCircle2, bg: "bg-emerald-50 border-emerald-200", iconColor: "text-emerald-600",
+      title: "🟢 Appareil retrouvé",
+      desc: "Cet appareil a été précédemment signalé mais a été retrouvé par son propriétaire.",
+    },
+    non_enregistre: {
+      icon: XCircle, bg: "bg-gray-50 border-gray-200", iconColor: "text-gray-500",
+      title: "⚪ Appareil non enregistré",
+      desc: "Cet appareil n'est pas dans la base SafeTrace. Soyez prudent lors de l'achat.",
+      action: "Demandez au vendeur de l'enregistrer sur SafeTrace avant tout achat.",
+    },
   };
 
   return (
@@ -174,47 +217,66 @@ const Scanner = () => {
                   </form>
                 </CardContent>
               </Card>
-
-              {searched && result && !loading && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6">
-                  <Card className={`border-2 ${resultDisplay[result.status!]?.bg}`}>
-                    <CardContent className="p-6 text-center">
-                      {(() => { const Icon = resultDisplay[result.status!]?.icon; return Icon ? <Icon className={`h-12 w-12 mx-auto mb-3 ${resultDisplay[result.status!]?.iconColor}`} /> : null; })()}
-                      <h3 className="font-display text-xl font-bold mb-2">{resultDisplay[result.status!]?.title}</h3>
-                      <p className="text-muted-foreground text-sm mb-4">{resultDisplay[result.status!]?.desc}</p>
-                      {result.marque && (
-                        <div className="bg-card/80 rounded-xl p-3 text-left space-y-1 border text-sm">
-                          <div className="flex justify-between"><span className="text-muted-foreground">Marque</span><span className="font-medium">{result.marque}</span></div>
-                          {result.modele && <div className="flex justify-between"><span className="text-muted-foreground">Modèle</span><span className="font-medium">{result.modele}</span></div>}
-                          {result.categorie && <div className="flex justify-between"><span className="text-muted-foreground">Catégorie</span><span className="font-medium">{result.categorie}</span></div>}
-                          {result.region && <div className="flex justify-between"><span className="text-muted-foreground">Région</span><span className="font-medium">{result.region}</span></div>}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              )}
             </motion.div>
           ) : (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <Card className="border-2">
                 <CardContent className="p-6">
-                  {cameraActive ? (
-                    <div className="relative rounded-xl overflow-hidden">
-                      <video ref={videoRef} className="w-full rounded-xl" autoPlay playsInline muted />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-safe-green rounded-xl" />
-                      </div>
-                      <p className="text-center text-sm text-muted-foreground mt-4">
-                        Pointez la caméra vers un QR code SafeTrace ou un code-barres
-                      </p>
-                    </div>
-                  ) : (
+                  <div id={scannerDivId} className="w-full rounded-xl overflow-hidden" />
+                  {!cameraActive && (
                     <div className="text-center py-8">
-                      <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                      <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-pulse" />
                       <p className="text-muted-foreground">Chargement de la caméra…</p>
                     </div>
                   )}
+                  <p className="text-center text-sm text-muted-foreground mt-4">
+                    Pointez la caméra vers un QR code SafeTrace
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* Results */}
+          {searched && result && !loading && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-6 space-y-4">
+              <Card className={`border-2 ${statusMessages[result.status!]?.bg}`}>
+                <CardContent className="p-6 text-center">
+                  {(() => { const Icon = statusMessages[result.status!]?.icon; return Icon ? <Icon className={`h-12 w-12 mx-auto mb-3 ${statusMessages[result.status!]?.iconColor}`} /> : null; })()}
+                  <h3 className="font-display text-xl font-bold mb-2">{statusMessages[result.status!]?.title}</h3>
+                  <p className="text-muted-foreground text-sm mb-2">{statusMessages[result.status!]?.desc}</p>
+                  
+                  {statusMessages[result.status!]?.action && (
+                    <p className="text-sm font-semibold mt-3 p-3 bg-card rounded-lg border">
+                      {statusMessages[result.status!]?.action}
+                    </p>
+                  )}
+
+                  {result.marque && (
+                    <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mt-4 border text-sm">
+                      {result.categorie && <div className="flex justify-between"><span className="text-muted-foreground">Catégorie</span><span className="font-medium capitalize">{result.categorie}</span></div>}
+                      <div className="flex justify-between"><span className="text-muted-foreground">Marque</span><span className="font-medium">{result.marque}</span></div>
+                      {result.modele && <div className="flex justify-between"><span className="text-muted-foreground">Modèle</span><span className="font-medium">{result.modele}</span></div>}
+                      {result.couleur && <div className="flex justify-between"><span className="text-muted-foreground">Couleur</span><span className="font-medium">{result.couleur}</span></div>}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* SafeTrace contact - always shown */}
+              <Card className="border-2 border-safe-green/30 bg-safe-bg-green">
+                <CardContent className="p-4 text-center">
+                  <Phone className="h-6 w-6 text-safe-green mx-auto mb-2" />
+                  <p className="font-display font-bold text-sm mb-1">Contactez SafeTrace</p>
+                  <p className="text-muted-foreground text-xs mb-3">Pour toute information ou signalement</p>
+                  <div className="flex gap-2 justify-center">
+                    <Button asChild size="sm" variant="outline">
+                      <a href={`tel:${SAFETRACE_CONTACT.replace(/\s/g, "")}`}><Phone className="h-3 w-3 mr-1" /> Appeler</a>
+                    </Button>
+                    <Button asChild size="sm" className="bg-safe-green hover:bg-safe-green/90 text-white">
+                      <a href={`https://wa.me/${SAFETRACE_WA}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>

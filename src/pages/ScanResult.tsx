@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Shield, CheckCircle2, AlertTriangle, XCircle, ScanLine, ArrowLeft, MapPin, Phone } from "lucide-react";
+import { Shield, CheckCircle2, AlertTriangle, XCircle, ScanLine, ArrowLeft, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
@@ -12,20 +12,19 @@ type ScanStatus = "propre" | "vole" | "perdu" | "enquete" | "retrouve" | "non_en
 const SAFETRACE_CONTACT = "+225 07 07 16 79 21";
 const SAFETRACE_WA = "2250707167921";
 
-const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string }> = {
-  propre: { icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200", title: "✅ Appareil propre — Aucun signalement", desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif." },
-  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 ATTENTION — Appareil signalé VOLÉ", desc: "Cet appareil a été signalé volé. N'achetez PAS cet appareil. Veuillez saisir la personne en possession de cet actif et contacter immédiatement SafeTrace." },
-  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Appareil signalé PERDU", desc: "Cet appareil a été déclaré perdu par son propriétaire. Veuillez contacter SafeTrace pour le restituer." },
-  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 Appareil en cours d'enquête", desc: "Cet appareil fait l'objet d'une enquête. Contactez SafeTrace pour plus d'informations." },
-  retrouve: { icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", borderColor: "border-emerald-200", title: "🟢 Appareil retrouvé", desc: "Cet appareil a été retrouvé par son propriétaire." },
-  non_enregistre: { icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200", title: "⚪ Appareil non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace. Prudence lors de l'achat." },
+const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string; action?: string }> = {
+  propre: { icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200", title: "✅ Appareil propre — Aucun signalement", desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute confiance." },
+  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 ATTENTION — Appareil signalé VOLÉ", desc: "Cet appareil a été signalé VOLÉ sur SafeTrace.", action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez SAISIR la personne en possession de cet actif et appeler immédiatement SafeTrace." },
+  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Appareil signalé PERDU", desc: "Cet appareil a été déclaré PERDU par son propriétaire.", action: "Veuillez contacter SafeTrace pour aider à la restitution de cet appareil." },
+  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 Appareil en cours d'enquête", desc: "Cet appareil fait l'objet d'une enquête en cours.", action: "Contactez SafeTrace pour plus d'informations." },
+  retrouve: { icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", borderColor: "border-emerald-200", title: "🟢 Appareil retrouvé", desc: "Cet appareil a été précédemment signalé mais a été retrouvé par son propriétaire." },
+  non_enregistre: { icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200", title: "⚪ Appareil non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace. Soyez prudent lors de l'achat.", action: "Demandez au vendeur de l'enregistrer sur SafeTrace avant tout achat." },
 };
 
 const ScanResult = () => {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
   const [device, setDevice] = useState<any>(null);
-  const [owner, setOwner] = useState<any>(null);
   const [status, setStatus] = useState<ScanStatus>("non_enregistre");
 
   useEffect(() => {
@@ -35,10 +34,7 @@ const ScanResult = () => {
       if (data) {
         setDevice(data);
         setStatus(data.statut as ScanStatus);
-        // Fetch owner info
-        const { data: profile } = await supabase.from("profiles").select("nom, prenoms, username, whatsapp, region, user_type").eq("id", data.user_id).single();
-        if (profile) setOwner(profile);
-        // Notify owner
+        // Notify owner (no personal info exposed)
         const { data: session } = await supabase.auth.getSession();
         if (session?.session?.user?.id !== data.user_id) {
           await supabase.from("notifications").insert({
@@ -76,30 +72,27 @@ const ScanResult = () => {
                 <CardContent className="p-6 text-center">
                   {(() => { const Icon = config.icon; return <Icon className={`h-14 w-14 mx-auto mb-3 ${config.iconColor}`} />; })()}
                   <h2 className="font-display text-lg md:text-xl font-bold mb-2">{config.title}</h2>
-                  <p className="text-muted-foreground text-sm mb-4">{config.desc}</p>
+                  <p className="text-muted-foreground text-sm mb-2">{config.desc}</p>
+
+                  {config.action && (
+                    <p className="text-sm font-semibold mt-3 p-3 bg-card rounded-lg border">
+                      {config.action}
+                    </p>
+                  )}
 
                   {device && (
-                    <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mb-4 border text-sm">
+                    <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 mt-4 border text-sm">
                       <div className="flex justify-between"><span className="text-muted-foreground">Catégorie</span><span className="font-medium capitalize">{device.categorie}</span></div>
                       <div className="flex justify-between"><span className="text-muted-foreground">Marque</span><span className="font-medium">{device.marque}</span></div>
                       {device.modele && <div className="flex justify-between"><span className="text-muted-foreground">Modèle</span><span className="font-medium">{device.modele}</span></div>}
                       {device.couleur && <div className="flex justify-between"><span className="text-muted-foreground">Couleur</span><span className="font-medium">{device.couleur}</span></div>}
-                      {device.region && <div className="flex justify-between"><span className="text-muted-foreground">Région</span><span className="font-medium">{device.region}</span></div>}
                       <div className="flex justify-between"><span className="text-muted-foreground">Enregistré le</span><span className="font-medium">{new Date(device.created_at).toLocaleDateString("fr-FR")}</span></div>
-                    </div>
-                  )}
-
-                  {owner && (
-                    <div className="bg-card/80 rounded-xl p-4 text-left space-y-2 border text-sm">
-                      <p className="font-display font-semibold text-xs text-muted-foreground mb-1">PROPRIÉTAIRE</p>
-                      <div className="flex justify-between"><span className="text-muted-foreground">Nom</span><span className="font-medium">{owner.prenoms} {owner.nom}</span></div>
-                      {owner.region && <div className="flex justify-between"><span className="text-muted-foreground">Région</span><span className="font-medium">{owner.region}</span></div>}
                     </div>
                   )}
                 </CardContent>
               </Card>
 
-              {/* SafeTrace contact card - always shown */}
+              {/* SafeTrace contact - always shown */}
               <Card className="border-2 border-safe-green/30 bg-safe-bg-green">
                 <CardContent className="p-4 text-center">
                   <Phone className="h-6 w-6 text-safe-green mx-auto mb-2" />
