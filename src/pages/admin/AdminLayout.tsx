@@ -12,6 +12,7 @@ const navItems = [
   { to: "/admin/signalements", label: "Signalements", icon: AlertTriangle },
   { to: "/admin/paiements", label: "Paiements", icon: CreditCard },
   { to: "/admin/contacts", label: "Messages", icon: MessageSquare },
+  { to: "/admin/documentation", label: "Documentation", icon: Shield },
 ];
 
 const AdminLayout = ({ children }: { children: ReactNode }) => {
