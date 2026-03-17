@@ -7,7 +7,7 @@ import Layout from "@/components/layout/Layout";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 
 const SAFETRACE_CONTACT = "+225 07 07 16 79 21";
 const SAFETRACE_WA = "2250707167921";
@@ -20,8 +20,37 @@ interface ScanData {
   modele?: string;
   categorie?: string;
   couleur?: string;
+  ownerName?: string;
+  ownerLocation?: string;
   dateEnregistrement?: string;
 }
+
+/** Extract a SafeTrace token from a URL or return raw text */
+const extractIdentifier = (text: string): string => {
+  const t = text.trim();
+  // Match /scan/ST-CI-... in any URL
+  const m = t.match(/\/scan\/(ST-CI-[A-Z0-9-]+)/i);
+  if (m) return m[1];
+  // Try parsing as URL
+  try {
+    const url = new URL(t);
+    const parts = url.pathname.split("/");
+    const idx = parts.indexOf("scan");
+    if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+  } catch {}
+  return t;
+};
+
+const abbreviateOwner = (nom: string, prenoms: string): string => {
+  if (!nom) return prenoms || "";
+  return `${nom.charAt(0)}. ${prenoms}`;
+};
+
+const formatLocation = (dept?: string | null, sp?: string | null): string => {
+  let loc = dept || "";
+  if (sp) loc += (loc ? " S/P " : "S/P ") + sp;
+  return loc;
+};
 
 const Scanner = () => {
   const { toast } = useToast();
@@ -38,6 +67,7 @@ const Scanner = () => {
     if (/^\d{14,16}$/.test(value)) return "IMEI détecté";
     if (/^[A-HJ-NPR-Z0-9]{17}$/i.test(value)) return "Numéro de châssis (VIN) détecté";
     if (/^ST-CI-/i.test(value)) return "Code SafeTrace détecté";
+    if (/^https?:\/\//i.test(value)) return "Lien SafeTrace détecté";
     if (value.length > 3) return "Recherche en cours…";
     return "";
   };
@@ -47,24 +77,43 @@ const Scanner = () => {
     setLoading(true);
     setSearched(true);
 
-    let data = null;
-    const val = q.trim();
+    const val = extractIdentifier(q);
+    let data: any = null;
 
-    // Try all identifiers
-    for (const field of ["token", "imei1", "imei2", "chassis", "num_serie", "plaque"] as const) {
-      const res = await supabase.from("devices").select("*").eq(field, val).maybeSingle();
+    // Search all identifier fields in parallel for speed
+    const fields = ["token", "imei1", "imei2", "chassis", "num_serie", "plaque"] as const;
+    const results = await Promise.all(
+      fields.map((field) =>
+        supabase.from("devices").select("*").eq(field, val).maybeSingle()
+      )
+    );
+    for (const res of results) {
       if (res.data) { data = res.data; break; }
     }
 
-    setLoading(false);
-
     if (data) {
+      // Fetch owner info (abbreviated)
+      let ownerName = "";
+      let ownerLocation = "";
+      const { data: owner } = await supabase
+        .from("profiles")
+        .select("nom, prenoms, departement, sous_prefecture")
+        .eq("id", data.user_id)
+        .maybeSingle();
+
+      if (owner) {
+        ownerName = abbreviateOwner(owner.nom, owner.prenoms);
+        ownerLocation = formatLocation(owner.departement, owner.sous_prefecture);
+      }
+
       setResult({
         status: data.statut as ResultStatus,
         marque: data.marque,
         modele: data.modele || undefined,
         categorie: data.categorie,
         couleur: data.couleur || undefined,
+        ownerName,
+        ownerLocation,
         dateEnregistrement: data.created_at,
       });
 
@@ -81,6 +130,7 @@ const Scanner = () => {
     } else {
       setResult({ status: "non_enregistre" });
     }
+    setLoading(false);
   }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
@@ -89,21 +139,25 @@ const Scanner = () => {
     await searchDevice(query);
   };
 
-  // QR Scanner with html5-qrcode
   const startScanner = useCallback(async () => {
     try {
-      const scanner = new Html5Qrcode(scannerDivId);
+      const scanner = new Html5Qrcode(scannerDivId, {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.QR_CODE,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.DATA_MATRIX,
+          Html5QrcodeSupportedFormats.PDF_417,
+        ],
+      });
       scannerRef.current = scanner;
 
       await scanner.start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1,
-        },
+        { fps: 15, qrbox: { width: 280, height: 280 }, aspectRatio: 1, disableFlip: false },
         (decodedText) => {
-          // QR code detected
           setQuery(decodedText);
           scanner.stop().then(() => {
             setCameraActive(false);
@@ -111,7 +165,7 @@ const Scanner = () => {
             searchDevice(decodedText);
           });
         },
-        () => { /* ignore errors during scanning */ }
+        () => {}
       );
       setCameraActive(true);
     } catch (err) {
@@ -123,9 +177,7 @@ const Scanner = () => {
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-      } catch { /* already stopped */ }
+      try { await scannerRef.current.stop(); } catch {}
       scannerRef.current = null;
     }
     setCameraActive(false);
@@ -133,8 +185,7 @@ const Scanner = () => {
 
   useEffect(() => {
     if (mode === "camera") {
-      // Small delay to let the div render
-      const timer = setTimeout(() => startScanner(), 300);
+      const timer = setTimeout(() => startScanner(), 200);
       return () => { clearTimeout(timer); stopScanner(); };
     } else {
       stopScanner();
@@ -152,19 +203,19 @@ const Scanner = () => {
       icon: AlertTriangle, bg: "bg-red-50 border-red-300", iconColor: "text-red-600",
       title: "🔴 ATTENTION — Appareil signalé VOLÉ",
       desc: "Cet appareil a été signalé VOLÉ sur SafeTrace.",
-      action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez SAISIR la personne en possession de cet actif et appeler immédiatement SafeTrace.",
+      action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez signaler ce voleur et alerter au poste des forces de l'ordre le plus proche. Appelez immédiatement SafeTrace.",
     },
     perdu: {
       icon: AlertTriangle, bg: "bg-yellow-50 border-yellow-200", iconColor: "text-yellow-600",
       title: "🟡 Appareil signalé PERDU",
       desc: "Cet appareil a été déclaré PERDU par son propriétaire.",
-      action: "Veuillez contacter SafeTrace pour aider à restituer cet appareil à son propriétaire.",
+      action: "Veuillez contacter SafeTrace et déposer cet appareil au poste des forces de l'ordre le plus proche.",
     },
     enquete: {
       icon: Shield, bg: "bg-blue-50 border-blue-200", iconColor: "text-blue-600",
       title: "🔵 Appareil en cours d'enquête",
       desc: "Cet appareil fait l'objet d'une enquête en cours.",
-      action: "Contactez SafeTrace pour plus d'informations sur cet appareil.",
+      action: "Contactez immédiatement les forces de l'ordre et SafeTrace pour signaler la détention de cet appareil.",
     },
     retrouve: {
       icon: CheckCircle2, bg: "bg-emerald-50 border-emerald-200", iconColor: "text-emerald-600",
@@ -177,6 +228,11 @@ const Scanner = () => {
       desc: "Cet appareil n'est pas dans la base SafeTrace. Soyez prudent lors de l'achat.",
       action: "Demandez au vendeur de l'enregistrer sur SafeTrace avant tout achat.",
     },
+  };
+
+  const getCategorieLabel = (cat?: string) => {
+    const labels: Record<string, string> = { telephone: "téléphone", ordinateur: "ordinateur", televiseur: "téléviseur", electromenager: "appareil", voiture: "véhicule", moto: "moto" };
+    return labels[cat || ""] || "appareil";
   };
 
   return (
@@ -222,7 +278,7 @@ const Scanner = () => {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <Card className="border-2">
                 <CardContent className="p-6">
-                  <div id={scannerDivId} className="w-full rounded-xl overflow-hidden" />
+                  <div id={scannerDivId} className="w-full rounded-xl overflow-hidden" style={{ minHeight: 300 }} />
                   {!cameraActive && (
                     <div className="text-center py-8">
                       <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-pulse" />
@@ -230,7 +286,7 @@ const Scanner = () => {
                     </div>
                   )}
                   <p className="text-center text-sm text-muted-foreground mt-4">
-                    Pointez la caméra vers un QR code SafeTrace
+                    Pointez la caméra vers un QR code ou code-barres
                   </p>
                 </CardContent>
               </Card>
@@ -245,7 +301,16 @@ const Scanner = () => {
                   {(() => { const Icon = statusMessages[result.status!]?.icon; return Icon ? <Icon className={`h-12 w-12 mx-auto mb-3 ${statusMessages[result.status!]?.iconColor}`} /> : null; })()}
                   <h3 className="font-display text-xl font-bold mb-2">{statusMessages[result.status!]?.title}</h3>
                   <p className="text-muted-foreground text-sm mb-2">{statusMessages[result.status!]?.desc}</p>
-                  
+
+                  {/* Owner abbreviated info */}
+                  {result.ownerName && result.status !== "non_enregistre" && (
+                    <p className="text-sm font-semibold mt-2">
+                      Ce {getCategorieLabel(result.categorie)} est la propriété de{" "}
+                      <span className="text-primary">{result.ownerName}</span>
+                      {result.ownerLocation && <span className="text-muted-foreground"> — {result.ownerLocation}</span>}
+                    </p>
+                  )}
+
                   {statusMessages[result.status!]?.action && (
                     <p className="text-sm font-semibold mt-3 p-3 bg-card rounded-lg border">
                       {statusMessages[result.status!]?.action}
@@ -263,7 +328,6 @@ const Scanner = () => {
                 </CardContent>
               </Card>
 
-              {/* SafeTrace contact - always shown */}
               <Card className="border-2 border-safe-green/30 bg-safe-bg-green">
                 <CardContent className="p-4 text-center">
                   <Phone className="h-6 w-6 text-safe-green mx-auto mb-2" />

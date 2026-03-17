@@ -12,12 +12,28 @@ type ScanStatus = "propre" | "vole" | "perdu" | "enquete" | "retrouve" | "non_en
 const SAFETRACE_CONTACT = "+225 07 07 16 79 21";
 const SAFETRACE_WA = "2250707167921";
 
+const abbreviateOwner = (nom: string, prenoms: string): string => {
+  if (!nom) return prenoms || "";
+  return `${nom.charAt(0)}. ${prenoms}`;
+};
+
+const formatLocation = (dept?: string | null, sp?: string | null): string => {
+  let loc = dept || "";
+  if (sp) loc += (loc ? " S/P " : "S/P ") + sp;
+  return loc;
+};
+
+const getCategorieLabel = (cat?: string) => {
+  const labels: Record<string, string> = { telephone: "téléphone", ordinateur: "ordinateur", televiseur: "téléviseur", electromenager: "appareil", voiture: "véhicule", moto: "moto" };
+  return labels[cat || ""] || "appareil";
+};
+
 const statusConfig: Record<ScanStatus, { icon: any; bg: string; iconColor: string; borderColor: string; title: string; desc: string; action?: string }> = {
   propre: { icon: CheckCircle2, bg: "bg-green-50", iconColor: "text-green-600", borderColor: "border-green-200", title: "✅ Appareil propre — Aucun signalement", desc: "Cet appareil est enregistré sur SafeTrace et aucun signalement n'est actif. Vous pouvez procéder à l'achat en toute confiance." },
-  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 ATTENTION — Appareil signalé VOLÉ", desc: "Cet appareil a été signalé VOLÉ sur SafeTrace.", action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez SAISIR la personne en possession de cet actif et appeler immédiatement SafeTrace." },
-  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Appareil signalé PERDU", desc: "Cet appareil a été déclaré PERDU par son propriétaire.", action: "Veuillez contacter SafeTrace pour aider à la restitution de cet appareil." },
-  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 Appareil en cours d'enquête", desc: "Cet appareil fait l'objet d'une enquête en cours.", action: "Contactez SafeTrace pour plus d'informations." },
-  retrouve: { icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", borderColor: "border-emerald-200", title: "🟢 Appareil retrouvé", desc: "Cet appareil a été précédemment signalé mais a été retrouvé par son propriétaire." },
+  vole: { icon: AlertTriangle, bg: "bg-red-50", iconColor: "text-red-600", borderColor: "border-red-300", title: "🔴 ATTENTION — Appareil signalé VOLÉ", desc: "Cet appareil a été signalé VOLÉ sur SafeTrace.", action: "⚠️ N'ACHETEZ PAS cet appareil. Veuillez signaler ce voleur et alerter au poste des forces de l'ordre le plus proche. Appelez immédiatement SafeTrace." },
+  perdu: { icon: AlertTriangle, bg: "bg-yellow-50", iconColor: "text-yellow-600", borderColor: "border-yellow-200", title: "🟡 Appareil signalé PERDU", desc: "Cet appareil a été déclaré PERDU par son propriétaire.", action: "Veuillez contacter SafeTrace et déposer cet appareil au poste des forces de l'ordre le plus proche." },
+  enquete: { icon: Shield, bg: "bg-blue-50", iconColor: "text-blue-600", borderColor: "border-blue-200", title: "🔵 Appareil en cours d'enquête", desc: "Cet appareil fait l'objet d'une enquête en cours.", action: "Contactez immédiatement les forces de l'ordre et SafeTrace." },
+  retrouve: { icon: CheckCircle2, bg: "bg-emerald-50", iconColor: "text-emerald-600", borderColor: "border-emerald-200", title: "🟢 Appareil retrouvé", desc: "Cet appareil a été précédemment signalé mais a été retrouvé." },
   non_enregistre: { icon: XCircle, bg: "bg-gray-50", iconColor: "text-gray-500", borderColor: "border-gray-200", title: "⚪ Appareil non enregistré", desc: "Cet appareil n'est pas dans la base SafeTrace. Soyez prudent lors de l'achat.", action: "Demandez au vendeur de l'enregistrer sur SafeTrace avant tout achat." },
 };
 
@@ -25,6 +41,7 @@ const ScanResult = () => {
   const { token } = useParams<{ token: string }>();
   const [loading, setLoading] = useState(true);
   const [device, setDevice] = useState<any>(null);
+  const [owner, setOwner] = useState<{ name: string; location: string } | null>(null);
   const [status, setStatus] = useState<ScanStatus>("non_enregistre");
 
   useEffect(() => {
@@ -34,7 +51,17 @@ const ScanResult = () => {
       if (data) {
         setDevice(data);
         setStatus(data.statut as ScanStatus);
-        // Notify owner (no personal info exposed)
+
+        // Fetch abbreviated owner info
+        const { data: profile } = await supabase.from("profiles").select("nom, prenoms, departement, sous_prefecture").eq("id", data.user_id).maybeSingle();
+        if (profile) {
+          setOwner({
+            name: abbreviateOwner(profile.nom, profile.prenoms),
+            location: formatLocation(profile.departement, profile.sous_prefecture),
+          });
+        }
+
+        // Notify owner
         const { data: session } = await supabase.auth.getSession();
         if (session?.session?.user?.id !== data.user_id) {
           await supabase.from("notifications").insert({
@@ -74,10 +101,17 @@ const ScanResult = () => {
                   <h2 className="font-display text-lg md:text-xl font-bold mb-2">{config.title}</h2>
                   <p className="text-muted-foreground text-sm mb-2">{config.desc}</p>
 
-                  {config.action && (
-                    <p className="text-sm font-semibold mt-3 p-3 bg-card rounded-lg border">
-                      {config.action}
+                  {/* Abbreviated owner info */}
+                  {owner && status !== "non_enregistre" && device && (
+                    <p className="text-sm font-semibold mt-2">
+                      Ce {getCategorieLabel(device.categorie)} est la propriété de{" "}
+                      <span className="text-primary">{owner.name}</span>
+                      {owner.location && <span className="text-muted-foreground"> — {owner.location}</span>}
                     </p>
+                  )}
+
+                  {config.action && (
+                    <p className="text-sm font-semibold mt-3 p-3 bg-card rounded-lg border">{config.action}</p>
                   )}
 
                   {device && (
@@ -92,7 +126,6 @@ const ScanResult = () => {
                 </CardContent>
               </Card>
 
-              {/* SafeTrace contact - always shown */}
               <Card className="border-2 border-safe-green/30 bg-safe-bg-green">
                 <CardContent className="p-4 text-center">
                   <Phone className="h-6 w-6 text-safe-green mx-auto mb-2" />

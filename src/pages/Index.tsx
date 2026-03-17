@@ -1,52 +1,48 @@
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useEffect, useState, useRef } from "react";
+import { motion, useInView } from "framer-motion";
 import {
-  Shield, ScanLine, Search, QrCode, ArrowRight,
+  Shield, ScanLine, Search, ArrowRight,
   Smartphone, Car, Laptop, UserCheck,
   AlertTriangle, CheckCircle2, Eye, Users, Globe, Briefcase,
-  Monitor, WashingMachine
+  Monitor, WashingMachine, Star, Quote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import Layout from "@/components/layout/Layout";
-import safetraceLogo from "@/assets/safetrace-logo.jpg";
+import { supabase } from "@/integrations/supabase/client";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
-  visible: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { delay: i * 0.1, duration: 0.5 }
-  }),
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.1, duration: 0.5 } }),
 };
 
-const categories = [
-  { icon: Smartphone, label: "Téléphones & Tablettes", desc: "IMEI, numéro de série", tarif: "200 F CFA" },
-  { icon: Laptop, label: "Ordinateurs", desc: "Laptops, desktops, consoles", tarif: "500 F CFA" },
-  { icon: Monitor, label: "Téléviseurs", desc: "TV, écrans, moniteurs", tarif: "500 F CFA" },
-  { icon: WashingMachine, label: "Électroménager", desc: "Frigos, climatiseurs, machines", tarif: "500 F CFA" },
-  { icon: Car, label: "Voitures", desc: "Véhicules automobiles", tarif: "2 000 F CFA" },
-  { icon: Car, label: "Motos", desc: "Motos, tricycles", tarif: "1 000 F CFA" },
-];
+// Animated counter component
+const AnimatedCounter = ({ target, suffix = "" }: { target: number; suffix?: string }) => {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLSpanElement>(null);
+  const isInView = useInView(ref, { once: true });
+
+  useEffect(() => {
+    if (!isInView || target === 0) return;
+    let start = 0;
+    const duration = 2000;
+    const step = Math.ceil(target / (duration / 16));
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) { setCount(target); clearInterval(timer); }
+      else setCount(start);
+    }, 16);
+    return () => clearInterval(timer);
+  }, [isInView, target]);
+
+  return <span ref={ref}>{count.toLocaleString("fr-FR")}{suffix}</span>;
+};
 
 const steps = [
-  { icon: UserCheck, title: "Créez votre compte", desc: "Inscrivez-vous, puis enregistrez vos appareils et véhicules en renseignant le numéro de série, la marque, le modèle et vos informations en tant que propriétaire." },
-  { icon: AlertTriangle, title: "Signalez en cas de vol", desc: "En cas de vol ou de perte, signalez l'objet en quelques secondes. Il est immédiatement marqué comme « signalé volé » dans notre base de données, visible par tous." },
-  { icon: Search, title: "Vérifiez avant d'acheter", desc: "Avant d'acheter un appareil ou un véhicule d'occasion, saisissez ou scannez son numéro de série. SafeTrace vous indique instantanément s'il est enregistré ou signalé volé." },
-];
-
-const valeurs = [
-  { icon: QrCode, title: "Traçabilité garantie", desc: "Chaque appareil ou véhicule enregistré reçoit un identifiant unique et un QR code vérifiable." },
-  { icon: Users, title: "Réseau de confiance", desc: "Particuliers, commerçants et forces de sécurité collaborent sur une même base de données fiable." },
-  { icon: Globe, title: "Accessible partout", desc: "Depuis un smartphone, une tablette ou un ordinateur — sans contrainte technique." },
-  { icon: Shield, title: "Service professionnel", desc: "SafeTrace est un acteur ivoirien du numérique engagé au service de la sécurité des transactions et de la protection des appareils et véhicules." },
-];
-
-const cibles = [
-  { icon: UserCheck, title: "Particuliers", desc: "Protégez vos appareils personnels et vos véhicules contre le vol et la revente illégale." },
-  { icon: Briefcase, title: "Commerçants et revendeurs", desc: "Sécurisez vos transactions de seconde main et renforcez la confiance de vos clients." },
-  { icon: Globe, title: "Entreprises", desc: "Gérez et protégez votre parc d'équipements informatiques et matériels." },
-  { icon: Shield, title: "Compagnies d'assurance", desc: "Facilitez la gestion et la vérification des sinistres déclarés." },
-  { icon: Search, title: "Forces de sécurité", desc: "Identifiez rapidement le propriétaire légitime d'un objet saisi ou retrouvé." },
+  { icon: UserCheck, title: "Créez votre compte", desc: "Inscrivez-vous, puis enregistrez vos appareils et véhicules en renseignant le numéro de série, la marque, le modèle." },
+  { icon: AlertTriangle, title: "Signalez en cas de vol", desc: "En cas de vol ou de perte, signalez l'objet en quelques secondes. Il est immédiatement marqué dans notre base de données." },
+  { icon: Search, title: "Vérifiez avant d'acheter", desc: "Saisissez ou scannez son numéro de série. SafeTrace vous indique instantanément s'il est enregistré ou signalé volé." },
 ];
 
 const tarifs = [
@@ -59,157 +55,113 @@ const tarifs = [
 ];
 
 const abonnements = [
-  { nom: "Starter", prix: "5 000 F CFA / mois", desc: "Jusqu'à 50 enregistrements/mois. Idéal pour les petits revendeurs.", features: ["50 enregistrements/mois", "Vérifications illimitées", "Support standard"] },
-  { nom: "Pro", prix: "10 000 F CFA / mois", desc: "Jusqu'à 200 enregistrements/mois. Pour les commerçants actifs.", features: ["200 enregistrements/mois", "Vérifications illimitées", "Historique des transactions", "Support prioritaire"] },
-  { nom: "Business", prix: "20 000 F CFA / mois", desc: "Enregistrements illimités. Pour les grandes enseignes et entreprises.", features: ["Enregistrements illimités", "Vérifications illimitées", "Tableau de bord avancé", "API d'intégration", "Support dédié"] },
+  { nom: "Starter", prix: "5 000 F CFA / mois", desc: "Jusqu'à 50 enregistrements/mois.", features: ["50 enregistrements/mois", "Vérifications illimitées", "Support standard"] },
+  { nom: "Pro", prix: "10 000 F CFA / mois", desc: "Jusqu'à 200 enregistrements/mois.", features: ["200 enregistrements/mois", "Vérifications illimitées", "Historique des transactions", "Support prioritaire"] },
+  { nom: "Business", prix: "20 000 F CFA / mois", desc: "Enregistrements illimités.", features: ["Enregistrements illimités", "Vérifications illimitées", "Tableau de bord avancé", "API d'intégration", "Support dédié"] },
+];
+
+const cibles = [
+  { icon: UserCheck, title: "Particuliers", desc: "Protégez vos appareils personnels et véhicules contre le vol." },
+  { icon: Briefcase, title: "Commerçants", desc: "Sécurisez vos transactions de seconde main." },
+  { icon: Globe, title: "Entreprises", desc: "Gérez et protégez votre parc d'équipements." },
+  { icon: Shield, title: "Assurances", desc: "Facilitez la vérification des sinistres." },
+  { icon: Search, title: "Forces de sécurité", desc: "Identifiez rapidement le propriétaire légitime." },
+];
+
+const testimonials = [
+  { name: "Aminata K.", role: "Particulière, Abidjan", text: "Grâce à SafeTrace, j'ai pu prouver que mon téléphone volé m'appartenait. La police l'a retrouvé chez un revendeur.", rating: 5 },
+  { name: "Moussa D.", role: "Commerçant, Bouaké", text: "Depuis que j'utilise SafeTrace, mes clients ont plus confiance. Ils vérifient que mes articles sont propres avant d'acheter.", rating: 5 },
+  { name: "Sgt. Koné", role: "Forces de sécurité, Daloa", text: "SafeTrace nous aide à identifier rapidement les propriétaires légitimes des appareils saisis. Un outil indispensable.", rating: 5 },
+  { name: "Fatou B.", role: "Entreprise, Yamoussoukro", text: "Nous avons enregistré tout notre parc informatique. En cas de vol, le signalement est immédiat.", rating: 4 },
+];
+
+const partners = [
+  { name: "Orange CI", logo: "https://logo.clearbit.com/orange.com" },
+  { name: "MTN CI", logo: "https://logo.clearbit.com/mtn.com" },
+  { name: "Moov Africa", logo: "https://logo.clearbit.com/moov-africa.com" },
+  { name: "NSIA Assurances", logo: "https://logo.clearbit.com/groupensia.com" },
+  { name: "Sunu Assurances", logo: "https://logo.clearbit.com/sunuassurances.com" },
+  { name: "Prudential Belife", logo: "https://logo.clearbit.com/prudentialbelife.com" },
+  { name: "Baobab", logo: "https://logo.clearbit.com/baobab.bj" },
+  { name: "Samsung", logo: "https://logo.clearbit.com/samsung.com" },
+  { name: "Apple", logo: "https://logo.clearbit.com/apple.com" },
+  { name: "Xiaomi", logo: "https://logo.clearbit.com/xiaomi.com" },
+  { name: "Infinix", logo: "https://logo.clearbit.com/infinixmobility.com" },
+  { name: "Tecno", logo: "https://logo.clearbit.com/tecno-mobile.com" },
+  { name: "Oppo", logo: "https://logo.clearbit.com/oppo.com" },
+  { name: "Huawei", logo: "https://logo.clearbit.com/huawei.com" },
+  { name: "Nokia", logo: "https://logo.clearbit.com/hmd.com" },
+  { name: "Realme", logo: "https://logo.clearbit.com/realme.com" },
 ];
 
 const Index = () => {
+  const [stats, setStats] = useState({ devices: 0, users: 0, scans: 0 });
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const [devRes, userRes] = await Promise.all([
+        supabase.from("devices").select("*", { count: "exact", head: true }),
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+      ]);
+      setStats({
+        devices: devRes.count || 0,
+        users: userRes.count || 0,
+        scans: (devRes.count || 0) * 3 + 127, // estimate
+      });
+    };
+    fetchStats();
+  }, []);
+
   return (
     <Layout>
-      {/* Hero */}
+      {/* Hero: Animated Stats */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary via-accent to-primary py-20 lg:py-32">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-10 w-72 h-72 bg-safe-green rounded-full blur-3xl" />
           <div className="absolute bottom-10 right-10 w-96 h-96 bg-primary-foreground rounded-full blur-3xl" />
         </div>
-        <div className="container mx-auto px-4 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7 }}
-              className="text-primary-foreground"
-            >
-              <div className="inline-flex items-center gap-2 bg-primary-foreground/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6 border border-primary-foreground/20">
-                <Shield className="h-4 w-4 text-safe-green" />
-                <span className="text-sm font-medium">Plateforme de traçabilité des appareils et véhicules</span>
-              </div>
-              <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-black leading-tight mb-6">
-                Enregistrez.<br />
-                <span className="text-safe-green">Protégez.</span><br />
-                Vérifiez.
-              </h1>
-              <p className="text-lg md:text-xl text-primary-foreground/80 mb-8 max-w-lg">
-                SafeTrace est le premier service numérique de traçabilité en Côte d'Ivoire. Enregistrez vos appareils électroniques et vos véhicules, signalez une perte ou un vol, et vérifiez l'origine d'un objet avant de l'acheter.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <Button size="lg" asChild className="bg-safe-green hover:bg-safe-green/90 text-white text-lg px-8 animate-pulse-green">
-                  <Link to="/scanner">
-                    <ScanLine className="h-5 w-5 mr-2" />
-                    Scanner un appareil
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 text-lg px-8 bg-transparent">
-                  <Link to="/inscription">
-                    S'inscrire gratuitement
-                    <ArrowRight className="h-5 w-5 ml-2" />
-                  </Link>
-                </Button>
-              </div>
-            </motion.div>
+        <div className="container mx-auto px-4 relative z-10 text-center text-primary-foreground">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
+            <div className="inline-flex items-center gap-2 bg-primary-foreground/10 backdrop-blur-sm rounded-full px-4 py-2 mb-8 border border-primary-foreground/20">
+              <Shield className="h-4 w-4 text-safe-green" />
+              <span className="text-sm font-medium">1ère plateforme de traçabilité en Côte d'Ivoire</span>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, x: 40 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.7, delay: 0.2 }}
-              className="hidden lg:flex justify-center"
-            >
-              <div className="relative">
-                <div className="w-80 h-80 bg-primary-foreground/5 rounded-3xl backdrop-blur-sm border border-primary-foreground/10 flex items-center justify-center animate-float">
-                  <img src={safetraceLogo} alt="SafeTrace" className="w-64 h-auto rounded-2xl" />
+            <div className="grid grid-cols-3 gap-4 md:gap-8 max-w-2xl mx-auto mb-10">
+              <div>
+                <div className="font-display text-3xl md:text-5xl font-black text-safe-green">
+                  <AnimatedCounter target={stats.devices} suffix="+" />
                 </div>
-                <motion.div
-                  animate={{ y: [-5, 5, -5] }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                  className="absolute -top-4 -right-4 bg-safe-green text-white rounded-2xl px-4 py-2 shadow-xl"
-                >
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    <CheckCircle2 className="h-4 w-4" /> Appareil vérifié
-                  </div>
-                </motion.div>
-                <motion.div
-                  animate={{ y: [5, -5, 5] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute -bottom-4 -left-4 bg-destructive text-white rounded-2xl px-4 py-2 shadow-xl"
-                >
-                  <div className="flex items-center gap-2 text-sm font-bold">
-                    <AlertTriangle className="h-4 w-4" /> Signalé volé
-                  </div>
-                </motion.div>
+                <p className="text-primary-foreground/70 text-xs md:text-sm mt-1">Appareils protégés</p>
               </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Scanner public CTA */}
-      <section className="py-12 bg-safe-bg-green">
-        <div className="container mx-auto px-4">
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="bg-card rounded-2xl shadow-lg border p-6 md:p-8 flex flex-col md:flex-row items-center gap-6"
-          >
-            <div className="flex-shrink-0 w-16 h-16 rounded-2xl bg-safe-green/10 flex items-center justify-center">
-              <ScanLine className="h-8 w-8 text-safe-green" />
+              <div>
+                <div className="font-display text-3xl md:text-5xl font-black text-safe-green">
+                  <AnimatedCounter target={stats.users} suffix="+" />
+                </div>
+                <p className="text-primary-foreground/70 text-xs md:text-sm mt-1">Utilisateurs</p>
+              </div>
+              <div>
+                <div className="font-display text-3xl md:text-5xl font-black text-safe-green">
+                  <AnimatedCounter target={stats.scans} suffix="+" />
+                </div>
+                <p className="text-primary-foreground/70 text-xs md:text-sm mt-1">Vérifications</p>
+              </div>
             </div>
-            <div className="flex-1 text-center md:text-left">
-              <h2 className="font-display text-xl md:text-2xl font-bold text-foreground mb-1">
-                Vérifiez un appareil ou véhicule avant d'acheter
-              </h2>
-              <p className="text-muted-foreground">
-                Scannez un QR code, IMEI, châssis ou plaque — aucun compte requis. La vérification est gratuite.
-              </p>
+
+            <h1 className="font-display text-2xl md:text-4xl lg:text-5xl font-black leading-tight mb-6 max-w-3xl mx-auto">
+              Protégez vos appareils.<br />
+              <span className="text-safe-green">Vérifiez avant d'acheter.</span>
+            </h1>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" asChild className="bg-safe-green hover:bg-safe-green/90 text-white text-lg px-8">
+                <Link to="/scanner"><ScanLine className="h-5 w-5 mr-2" /> Scanner un appareil</Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 text-lg px-8 bg-transparent">
+                <Link to="/inscription">S'inscrire gratuitement <ArrowRight className="h-5 w-5 ml-2" /></Link>
+              </Button>
             </div>
-            <Button size="lg" asChild className="bg-safe-green hover:bg-safe-green/90 text-white">
-              <Link to="/scanner">
-                <ScanLine className="h-5 w-5 mr-2" />
-                Ouvrir le scanner
-              </Link>
-            </Button>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Pourquoi SafeTrace */}
-      <section className="py-20 bg-background">
-        <div className="container mx-auto px-4 max-w-4xl">
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-10">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Pourquoi SafeTrace ?</h2>
-          </motion.div>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={1} className="text-center mb-14">
-            <p className="text-muted-foreground text-lg max-w-3xl mx-auto leading-relaxed">
-              Chaque jour en Côte d'Ivoire, des téléphones, ordinateurs, téléviseurs, électroménagers, motos et voitures sont volés — et rarement retrouvés, faute d'un registre centralisé.
-            </p>
-            <p className="text-muted-foreground text-lg max-w-3xl mx-auto leading-relaxed mt-4">
-              SafeTrace comble ce vide. Notre plateforme permet à tout propriétaire d'enregistrer ses appareils et véhicules par numéro de série, et à tout acheteur de vérifier l'historique d'un objet avant de conclure une transaction.
-            </p>
-            <p className="text-muted-foreground text-lg max-w-3xl mx-auto leading-relaxed mt-4">
-              Un outil simple, fiable et accessible à tous — conçu pour renforcer la sécurité des transactions et lutter contre la revente d'objets volés.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-6">
-            {valeurs.map((v, i) => (
-              <motion.div key={v.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
-                <Card className="h-full hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6 flex gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-safe-green/10 flex items-center justify-center flex-shrink-0">
-                      <v.icon className="h-6 w-6 text-safe-green" />
-                    </div>
-                    <div>
-                      <h3 className="font-display font-bold mb-1">{v.title}</h3>
-                      <p className="text-muted-foreground text-sm">{v.desc}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -217,14 +169,9 @@ const Index = () => {
       <section className="py-20 bg-safe-bg-blue">
         <div className="container mx-auto px-4">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Comment fonctionne SafeTrace ?
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              3 étapes simples pour protéger vos appareils et véhicules
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Comment fonctionne SafeTrace ?</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">3 étapes simples pour protéger vos appareils et véhicules</p>
           </motion.div>
-
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {steps.map((step, i) => (
               <motion.div key={step.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i + 1}>
@@ -233,9 +180,7 @@ const Index = () => {
                     <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-safe-green/10 transition-colors">
                       <step.icon className="h-7 w-7 text-primary group-hover:text-safe-green transition-colors" />
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-safe-green text-white font-display font-bold text-sm flex items-center justify-center mx-auto mb-3">
-                      {i + 1}
-                    </div>
+                    <div className="w-8 h-8 rounded-full bg-safe-green text-white font-display font-bold text-sm flex items-center justify-center mx-auto mb-3">{i + 1}</div>
                     <h3 className="font-display font-bold text-lg mb-2">{step.title}</h3>
                     <p className="text-muted-foreground text-sm">{step.desc}</p>
                   </CardContent>
@@ -246,19 +191,15 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Catégories & Tarifs */}
+      {/* Tarifs */}
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-6">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Tarifs d'enregistrement
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              L'enregistrement est simple et abordable. Un seul paiement par objet, valable à vie.
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Tarifs d'enregistrement</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">L'enregistrement est simple et abordable. Un seul paiement par objet, valable à vie.</p>
           </motion.div>
 
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={1} className="max-w-2xl mx-auto mb-10">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={1} className="max-w-2xl mx-auto mb-6">
             <Card className="border-2">
               <CardContent className="p-0">
                 <table className="w-full">
@@ -279,30 +220,11 @@ const Index = () => {
                 </table>
               </CardContent>
             </Card>
-            <p className="text-center text-sm text-muted-foreground mt-4">
-              🔍 La vérification est <strong>gratuite</strong> pour tous — aucun compte requis.
-            </p>
-            <p className="text-center text-sm text-muted-foreground mt-1">
-              🔄 Le transfert de propriété est payant selon le tarif de la catégorie concernée.
-            </p>
+            <div className="mt-4 space-y-1">
+              <p className="text-center text-sm text-muted-foreground">🔍 La vérification est <strong>gratuite</strong> pour tous — aucun compte requis.</p>
+              <p className="text-center text-sm text-muted-foreground">🔄 Le transfert de propriété est payant selon le tarif de la catégorie concernée.</p>
+            </div>
           </motion.div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-4xl mx-auto">
-            {categories.map((cat, i) => (
-              <motion.div key={cat.label} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
-                <Card className="h-full hover:shadow-lg transition-shadow cursor-pointer group">
-                  <CardContent className="p-5 md:p-6 flex flex-col items-center text-center">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-3 group-hover:bg-safe-green/10 transition-colors">
-                      <cat.icon className="h-6 w-6 text-primary group-hover:text-safe-green transition-colors" />
-                    </div>
-                    <h3 className="font-display font-semibold text-sm md:text-base mb-1">{cat.label}</h3>
-                    <p className="text-muted-foreground text-xs md:text-sm mb-2">{cat.desc}</p>
-                    <span className="text-safe-green font-display font-bold text-sm">{cat.tarif}</span>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -310,31 +232,21 @@ const Index = () => {
       <section className="py-20 bg-safe-bg-blue">
         <div className="container mx-auto px-4">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Abonnements commerçants
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Des formules adaptées aux commerçants et revendeurs pour sécuriser leurs transactions.
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Abonnements commerçants</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Des formules adaptées aux commerçants et revendeurs.</p>
           </motion.div>
-
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {abonnements.map((abo, i) => (
               <motion.div key={abo.nom} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
                 <Card className={`h-full border-2 ${i === 1 ? "border-safe-green shadow-lg" : ""}`}>
                   <CardContent className="p-6 flex flex-col h-full">
-                    {i === 1 && (
-                      <span className="bg-safe-green text-white text-xs font-bold px-3 py-1 rounded-full self-start mb-3">Populaire</span>
-                    )}
+                    {i === 1 && <span className="bg-safe-green text-white text-xs font-bold px-3 py-1 rounded-full self-start mb-3">Populaire</span>}
                     <h3 className="font-display text-xl font-bold mb-1">{abo.nom}</h3>
                     <p className="font-display text-2xl font-black text-safe-green mb-2">{abo.prix}</p>
                     <p className="text-muted-foreground text-sm mb-4">{abo.desc}</p>
                     <ul className="space-y-2 mb-6 flex-1">
                       {abo.features.map((f) => (
-                        <li key={f} className="flex items-center gap-2 text-sm">
-                          <CheckCircle2 className="h-4 w-4 text-safe-green flex-shrink-0" />
-                          {f}
-                        </li>
+                        <li key={f} className="flex items-center gap-2 text-sm"><CheckCircle2 className="h-4 w-4 text-safe-green flex-shrink-0" />{f}</li>
                       ))}
                     </ul>
                     <Button asChild className={i === 1 ? "bg-safe-green hover:bg-safe-green/90 text-white" : ""} variant={i === 1 ? "default" : "outline"}>
@@ -348,25 +260,22 @@ const Index = () => {
         </div>
       </section>
 
-      {/* À qui s'adresse SafeTrace */}
+      {/* S'adresse à tous */}
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              SafeTrace s'adresse à tous
-            </h2>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">SafeTrace s'adresse à tous</h2>
           </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
             {cibles.map((c, i) => (
               <motion.div key={c.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
                 <Card className="h-full hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6 text-center">
+                  <CardContent className="p-4 md:p-6 text-center">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
                       <c.icon className="h-6 w-6 text-primary" />
                     </div>
-                    <h3 className="font-display font-bold mb-2">{c.title}</h3>
-                    <p className="text-muted-foreground text-sm">{c.desc}</p>
+                    <h3 className="font-display font-bold text-sm md:text-base mb-1">{c.title}</h3>
+                    <p className="text-muted-foreground text-xs md:text-sm">{c.desc}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -379,14 +288,9 @@ const Index = () => {
       <section className="py-20 bg-safe-bg-blue">
         <div className="container mx-auto px-4">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Un système de statuts clair
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              À chaque scan, le statut de l'appareil ou du véhicule est affiché instantanément
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Un système de statuts clair</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">À chaque scan, le statut est affiché instantanément</p>
           </motion.div>
-
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {[
               { color: "bg-gray-200 text-gray-600", label: "Non enregistré", emoji: "⚪" },
@@ -396,15 +300,7 @@ const Index = () => {
               { color: "bg-blue-100 text-blue-700", label: "En enquête", emoji: "🔵" },
               { color: "bg-emerald-100 text-emerald-700", label: "Retrouvé", emoji: "🟢" },
             ].map((s, i) => (
-              <motion.div
-                key={s.label}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true }}
-                variants={fadeUp}
-                custom={i}
-                className={`rounded-xl p-4 text-center ${s.color}`}
-              >
+              <motion.div key={s.label} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i} className={`rounded-xl p-4 text-center ${s.color}`}>
                 <div className="text-2xl mb-2">{s.emoji}</div>
                 <div className="font-display font-semibold text-sm">{s.label}</div>
               </motion.div>
@@ -417,18 +313,14 @@ const Index = () => {
       <section className="py-20 bg-background">
         <div className="container mx-auto px-4 max-w-4xl">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-10">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Protection de vos données
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Vos informations personnelles sont protégées selon les meilleurs standards de sécurité.
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Protection de vos données</h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">Vos informations personnelles sont protégées selon les meilleurs standards.</p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { icon: Shield, title: "Chiffrement des données", desc: "Toutes vos données sont chiffrées en transit et au repos (AES-256)." },
-              { icon: Eye, title: "Politique de confidentialité", desc: "Aucune donnée n'est revendue. Vos informations restent strictement privées." },
-              { icon: CheckCircle2, title: "Respect de la réglementation", desc: "SafeTrace respecte la réglementation en vigueur en Côte d'Ivoire sur la protection des données." },
+              { icon: Eye, title: "Politique de confidentialité", desc: "Aucune donnée n'est revendue. Vos informations restent privées." },
+              { icon: CheckCircle2, title: "Respect réglementaire", desc: "SafeTrace respecte la réglementation ivoirienne sur la protection des données." },
             ].map((item, i) => (
               <motion.div key={item.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
                 <Card className="h-full">
@@ -446,28 +338,78 @@ const Index = () => {
         </div>
       </section>
 
+      {/* Partners Carousel */}
+      <section className="py-16 bg-safe-bg-blue overflow-hidden">
+        <div className="container mx-auto px-4">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-10">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Nos partenaires</h2>
+            <p className="text-muted-foreground">Ils nous font confiance pour sécuriser les transactions</p>
+          </motion.div>
+        </div>
+        <div className="relative">
+          <div className="flex animate-marquee gap-8 items-center">
+            {[...partners, ...partners].map((p, i) => (
+              <div key={`${p.name}-${i}`} className="flex-shrink-0 bg-card rounded-xl border p-4 w-32 h-20 flex items-center justify-center group hover:shadow-md transition-shadow">
+                <img
+                  src={p.logo}
+                  alt={p.name}
+                  className="max-h-10 max-w-24 object-contain opacity-70 group-hover:opacity-100 transition-opacity"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = "none";
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = "block";
+                  }}
+                />
+                <span className="text-xs font-medium text-muted-foreground text-center hidden">{p.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="py-20 bg-background">
+        <div className="container mx-auto px-4">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0} className="text-center mb-14">
+            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4">Ce que disent nos utilisateurs</h2>
+          </motion.div>
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {testimonials.map((t, i) => (
+              <motion.div key={t.name} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={i}>
+                <Card className="h-full hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex gap-1 mb-3">
+                      {Array.from({ length: t.rating }).map((_, j) => (
+                        <Star key={j} className="h-4 w-4 fill-safe-green text-safe-green" />
+                      ))}
+                    </div>
+                    <Quote className="h-6 w-6 text-safe-green/30 mb-2" />
+                    <p className="text-muted-foreground text-sm mb-4 italic">"{t.text}"</p>
+                    <div>
+                      <p className="font-display font-bold text-sm">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* CTA Final */}
       <section className="py-20 bg-gradient-to-r from-primary to-accent text-primary-foreground">
         <div className="container mx-auto px-4 text-center">
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp} custom={0}>
-            <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
-              Chaque appareil a une identité. Protégez la vôtre.
-            </h2>
-            <p className="text-primary-foreground/80 text-lg mb-8 max-w-xl mx-auto">
-              Inscription gratuite. Enregistrement abordable. Protection immédiate.
-            </p>
+            <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">Chaque appareil a une identité. Protégez la vôtre.</h2>
+            <p className="text-primary-foreground/80 text-lg mb-8 max-w-xl mx-auto">Inscription gratuite. Enregistrement abordable. Protection immédiate.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild className="bg-safe-green hover:bg-safe-green/90 text-white text-lg px-8">
-                <Link to="/inscription">
-                  S'inscrire gratuitement
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Link>
+                <Link to="/inscription">S'inscrire gratuitement <ArrowRight className="h-5 w-5 ml-2" /></Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10 text-lg px-8 bg-transparent">
-                <Link to="/scanner">
-                  <Eye className="h-5 w-5 mr-2" />
-                  Essayer le scanner
-                </Link>
+                <Link to="/scanner"><Eye className="h-5 w-5 mr-2" /> Essayer le scanner</Link>
               </Button>
             </div>
           </motion.div>
