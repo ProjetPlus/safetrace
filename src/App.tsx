@@ -32,6 +32,11 @@ import AdminDevices from "./pages/admin/AdminDevices";
 import AdminReports from "./pages/admin/AdminReports";
 import AdminPayments from "./pages/admin/AdminPayments";
 import AdminContacts from "./pages/admin/AdminContacts";
+import AdminDocumentation from "./pages/admin/AdminDocumentation";
+import DashboardCommercant from "./pages/DashboardCommercant";
+import DashboardEntreprise from "./pages/DashboardEntreprise";
+import DashboardAssurance from "./pages/DashboardAssurance";
+import DashboardForces from "./pages/DashboardForces";
 
 const queryClient = new QueryClient();
 
@@ -44,7 +49,6 @@ const App = () => (
         <AuthProvider>
           <ScrollToTop />
           <Routes>
-            {/* Public routes */}
             <Route path="/" element={<Index />} />
             <Route path="/scanner" element={<Scanner />} />
             <Route path="/inscription" element={<Inscription />} />
@@ -59,13 +63,18 @@ const App = () => (
             <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Protected routes */}
             <Route path="/tableau-de-bord" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/mes-biens" element={<ProtectedRoute><MesBiens /></ProtectedRoute>} />
             <Route path="/enregistrer-bien" element={<ProtectedRoute><EnregistrerBien /></ProtectedRoute>} />
             <Route path="/signaler" element={<ProtectedRoute><Signaler /></ProtectedRoute>} />
             <Route path="/profil" element={<ProtectedRoute><Profil /></ProtectedRoute>} />
             <Route path="/appareil/:id" element={<ProtectedRoute><DeviceDetail /></ProtectedRoute>} />
+
+            {/* Role-specific dashboards */}
+            <Route path="/espace-commercant" element={<ProtectedRoute><DashboardCommercant /></ProtectedRoute>} />
+            <Route path="/espace-entreprise" element={<ProtectedRoute><DashboardEntreprise /></ProtectedRoute>} />
+            <Route path="/espace-assurance" element={<ProtectedRoute><DashboardAssurance /></ProtectedRoute>} />
+            <Route path="/espace-forces" element={<ProtectedRoute><DashboardForces /></ProtectedRoute>} />
 
             {/* Admin routes */}
             <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
@@ -74,6 +83,7 @@ const App = () => (
             <Route path="/admin/signalements" element={<AdminRoute><AdminReports /></AdminRoute>} />
             <Route path="/admin/paiements" element={<AdminRoute><AdminPayments /></AdminRoute>} />
             <Route path="/admin/contacts" element={<AdminRoute><AdminContacts /></AdminRoute>} />
+            <Route path="/admin/documentation" element={<AdminRoute><AdminDocumentation /></AdminRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -151,7 +151,8 @@ const Scanner = () => {
           Html5QrcodeSupportedFormats.DATA_MATRIX,
           Html5QrcodeSupportedFormats.PDF_417,
         ],
-      });
+        verbose: false,
+      } as any);
       scannerRef.current = scanner;
 
       await scanner.start(
